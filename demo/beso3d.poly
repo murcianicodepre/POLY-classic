@@ -1,0 +1,55 @@
+# beso 3D ~ diegojose.parragan@um.es
+camera:
+  position: [0.0, 0.0, -0.2]
+  fov: 45.0
+
+materials:
+  # jo material
+  - name: "cube_mat"
+    texture: "models/cube/beso.png"
+    diffuse: 2.0
+    specular: 32.0
+
+  # sky material
+  - name: "sky_mat"
+    texture: "skybox/sky2.png"
+    diffuse: 2.0
+    specular: 32.0
+
+  # floor material
+  - name: "floor_mat"
+    texture: "models/cube/cube_texture.png"
+    diffuse: 2.0
+    specular: 32.0
+
+objects:
+  # jo
+  - material: "cube_mat"
+    file: "models/cube/cube.ply"
+    transforms:
+      scale: 0.5
+      rotateY: 45.0
+      rotateX: -20.0
+      move: [0.0, 0.0, 1.0]
+  
+
+  # skybox
+  - material: "sky_mat"
+    file: "skybox/skybox.ply"
+    flags:
+      - DISABLE_SHADING
+    transforms:
+      move: [0.0, 0.0, 1.0]
+
+  # floor
+  - material: "floor_mat"
+    file: "models/quad/quad.ply"
+    transforms:
+      scale: 1.5
+      rotateX: 90.0
+      move: [0.0, -0.4, 1.5]
+
+lights:
+  - position: [0.6, 1.0, -1.0]
+    color: [255, 255, 255]
+    intensity: 0.8

@@ -1,0 +1,7 @@
+/home/diego/Escritorio/TFG/POLY-classic/build/CMakeFiles/poly-classic.dir
+/home/diego/Escritorio/TFG/POLY-classic/build/CMakeFiles/edit_cache.dir
+/home/diego/Escritorio/TFG/POLY-classic/build/CMakeFiles/rebuild_cache.dir
+/home/diego/Escritorio/TFG/POLY-classic/build/CMakeFiles/list_install_components.dir
+/home/diego/Escritorio/TFG/POLY-classic/build/CMakeFiles/install.dir
+/home/diego/Escritorio/TFG/POLY-classic/build/CMakeFiles/install/local.dir
+/home/diego/Escritorio/TFG/POLY-classic/build/CMakeFiles/install/strip.dir
