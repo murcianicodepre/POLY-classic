@@ -26,6 +26,7 @@
 #define TEXTURE_SIZE 1024
 #define FOV 60.0f
 #define AR 1.333333333f
+#define BLENDER false
 
 // Math defs
 #define PI 3.14159265f
@@ -36,18 +37,29 @@
 class RGBA;
 class Camera;
 class Tri;
+class Material;
+class Vertex;
+typedef Vertex Hit;
 
 // Main renderer class
 class PolyRenderer{
 public:
     RGBA* frame;
     Camera* cam;
+    Material* mats;
+    Tri* tris;
 
     PolyRenderer();
     ~PolyRenderer();
     bool loadScene(const char* path);
     bool render(uint threads);
     void save(const char* path);
+
+private:
+    uint N_TRIS, N_MATS;
+
+    RGBA intersection_shader(int x, int y);
+    RGBA pixel_shader(Hit &hit, uint triId);
 };
 
 #endif

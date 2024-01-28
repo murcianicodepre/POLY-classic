@@ -1,5 +1,5 @@
 /*
-    POLY classc ~ main header class
+    POLY-classic ~ main header class
     Diego Párraga Nicolás ~ diegojose.parragan@um.es
 */
 
@@ -62,10 +62,12 @@ public:
     uint16_t r, g, b, a;
     RGBA() : r(0u), g(0u), b(0u), a(0u) {}
     RGBA(uint16_t r, uint16_t g, uint16_t b, uint16_t a) : r(r), g(g), b(b), a(a) {}
+    //RGBA(float r, float g, float b, float a) : r(static_cast<uint16_t>(r)), g(static_cast<uint16_t>(g)), b(static_cast<uint16_t>(b)), a(static_cast<uint16_t>(a)) {}
     void clamp255(){ r = r>255 ? 255 : r; g = g>255 ? 255 : g; b = b>255 ? 255 : b; a = a>255 ? 255 : a; }
     RGBA operator+ (RGBA& color) { RGBA out = RGBA(r+color.r, g+color.g, b+color.b, a+color.a); out.clamp255(); return out; }
     RGBA operator- (RGBA& color) { RGBA out = RGBA(r-color.r, g-color.g, b-color.b, a-color.a); out.clamp255(); return out; }
     RGBA operator* (float f) { RGBA out = RGBA(static_cast<uint16_t>(r*f), static_cast<uint16_t>(g*f), static_cast<uint16_t>(b*f), static_cast<uint16_t>(a*f)); out.clamp255(); return out; }
+    RGBA operator* (V3f v) { RGBA out = RGBA(static_cast<uint16_t>(r*v.x), static_cast<uint16_t>(g*v.y), static_cast<uint16_t>(b*v.z), a); out.clamp255(); return out; }
 };
 
 /* Load png as RGBA texture */
@@ -197,30 +199,153 @@ public:
         return Ray(ori, dir.normalize());
     }
     void move(V3f m){ ori = ori + m; }
-    void rotateX(float r){ rx = r; }
-    void rotateY(float r){ ry = r; }
-    void rotateZ(float r){ rz = r; }
+    void setRotX(float r){ rx = r; }
+    void setRotY(float r){ ry = r; }
+    void setRotZ(float r){ rz = r; }
+    void setRot(V3f r){ rz = r.z; ry = ry; rx = r.x; }
+};
+
+/* Vertex class: V3f + texture coordinates */
+class Vertex {
+public:
+    V3f vector;
+    float u, v;
+    Vertex() : vector(), u(0.0f), v(0.0f) {}
+    Vertex(float x, float y, float z, float u, float v) : vector(x, y, z), u(u), v(v) {}
+    void move(V3f m){ vector = vector + m; }
+    void scale(float s){ vector = vector * s; }
+    void scale(V3f s){ vector = V3f(s.x * vector.x, s.y * vector.y, s.z * vector.z); }
+    void rotateX(float r){ vector.rotateX(r); }
+    void rotateY(float r){ vector.rotateY(r); }
+    void rotateZ(float r){ vector.rotateZ(r); }
+    void rotate(V3f r){ rotateZ(r.z); rotateY(r.y); rotateX(r.x); }
+    string toString(){
+        return "{" + vector.toString() + ", " + to_string(u) + ", " + to_string(v) + "}";
+    }
+};
+
+typedef Vertex Hit;
+
+/* Material class */
+class Material{
+public:
+    RGBA* texture, * normal;
+    RGBA color;
+    float diff, spec;
+    Material() : texture(NULL), normal(NULL), diff(0.0f), spec(0.0f) {}
+    Material(float diff, float spec) : texture(NULL), normal(NULL), diff(diff), spec(spec) {}
+    void loadTexture(const char* path){ texture = loadPNG(path); }  // Load png as texture
+    void loadNormal(const char* path){ normal = loadPNG(path); }    // Load png as normal map
+};
+
+/* Tri class */
+class Tri {
+public:
+    Vertex a, b, c;
+    uint matId;         // Material index for this Tri
+    Tri() : a(), b(), c() {}
+    Tri(Vertex a, Vertex b, Vertex c) : a(a), b(b), c(c) {}
+    bool intersect(Ray ray, Hit& hit){
+        V3f edge1 = b.vector - a.vector, edge2 = c.vector - a.vector, h = cross(ray.dir, edge2);
+
+        float A = dot(edge1, h);
+        if(A>-EPSILON && A<EPSILON) return false;   // Ray parallel
+
+        V3f s = ray.ori - a.vector;
+        float inv = 1.0f/A, U = inv * dot(s, h);
+        if(U<0 || U>1.0f) return false;
+
+        V3f q = cross(s, edge1);
+        float V = inv * dot(ray.dir, q);
+        if(V<0 || (U+V)>1.0f) return false;
+
+        float t = inv * dot(edge2, q);
+        if(t>EPSILON){  // Hit!
+            hit.vector = ray.point(t);
+            hit.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
+            hit.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
+            return true;
+        } else return false;
+    }
+    void move(V3f m){ a.move(m); b.move(m); c.move(m); }
+    void scale(float s){ a.scale(s); b.scale(s); c.scale(s); }
+    void scale(V3f s){ a.scale(s); b.scale(s); c.scale(s); }
+    void rotate(V3f r){ a.rotate(r); b.rotate(r); c.rotate(r); }
 };
 
 /* Renderer constructor */
 PolyRenderer::PolyRenderer(){
     frame = (RGBA*) malloc(sizeof(RGBA) * WIDTH * HEIGHT);
     memset((void*) frame, 0, sizeof(RGBA*) * WIDTH * HEIGHT);
+    tris = 0; mats = 0;
 }
 
 PolyRenderer::~PolyRenderer(){
     free(frame);
+    if(tris) free(tris);
+    if(mats) free(mats);
 }
 
 /* Load scene from .poly script */
 bool PolyRenderer::loadScene(const char* path){
+
+    vector<Tri> trivec;
+    vector<Material> matvec;
+
+    cam = new Camera(V3f(0.0f, 0.0f, 0.0f), 4.0f/3.0f, 90.0f);
+
+    Tri t = Tri(Vertex(0.0f, 0.0f, 0.0f, 0.0f, 1.0f), Vertex(0.0f, 1.0f, 0.0f, 0.0f, 0.0f), Vertex(1.0f, 0.0f, 0.0f, 1.0f, 1.0f));
+    t.matId = 0;
+    t.move(V3f(-0.5f, 0.0f, 1.2f));
+    trivec.push_back(t);
+
+    t = Tri(Vertex(0.0f, 1.0f, 0.0f, 0.0f, 0.0f), Vertex(1.0f, 1.0f, 0.0f, 1.0f, 0.0f), Vertex(1.0f, 0.0f, 0.0f, 1.0f, 1.0f));
+    t.matId = 0;
+    t.move(V3f(-0.5f, 0.0f, 1.2f));
+    trivec.push_back(t);
+
+    Material m = Material(2.0f, 32.0f);
+    m.loadTexture("demo/beso.png");
+    matvec.push_back(m);
+
+    // Copy data to renderer
+    N_TRIS = trivec.size(); N_MATS = matvec.size();
+    tris = (Tri*) malloc(sizeof(Tri)*N_TRIS); copy(trivec.begin(), trivec.end(), tris);
+    mats = (Material*) malloc(sizeof(Material)*N_MATS); copy(matvec.begin(), matvec.end(), mats);
+
+    printf("\e[1;93m loading '\e[95m%s\e[93m' \e[92mOK\e[0m\n", path);
+
     return true;
 }
 
-/* Main shader function; each thread run this when rendering pixel (x,y) */
-RGBA shader(int x, int y){
+/* Pixel shader: given a hit and a Tri, compute pixel color */
+RGBA PolyRenderer::pixel_shader(Hit& hit, uint triId){
     RGBA out;
 
+    int tx = hit.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
+    int ty = hit.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
+
+    Tri tri = tris[triId];
+    
+    out = mats[tri.matId].texture[tx + ty*TEXTURE_SIZE];
+
+    return out;
+}
+
+/* Intersection shader: compute scene intersection for pixel x,y */
+RGBA PolyRenderer::intersection_shader(int x, int y){
+    RGBA out;
+    Ray ray = cam->rayTo(x, y);
+    Hit hit;
+    
+    float z = 1000.0f;
+    for(uint i=0; i<N_TRIS; i++){
+        Tri tri = tris[i];
+        if(tri.intersect(ray, hit) && hit.vector.z<=z){
+            z = hit.vector.z;
+            out = pixel_shader(hit, i);
+        }
+    }
 
     return out;
 }
@@ -233,10 +358,10 @@ bool PolyRenderer::render(uint threads){
     printf("\e[1;93m rendering ");
 
     tini = static_cast<float>(omp_get_wtime());
-    #pragma omp parallel for collapse(2) shared(frame) num_threads(threads) schedule(static)
+    #pragma omp parallel for collapse(2) shared(frame) num_threads(threads) schedule(static) shared(tris, mats)
         for(int y=0; y<HEIGHT; y++)
             for(int x=0; x<WIDTH; x++)
-                frame[x + y*WIDTH] = shader(x, y);
+                frame[x + y*WIDTH] = intersection_shader(x, y);
         
     trender = static_cast<float>(omp_get_wtime()) - tini;
     printf("\e[95m%.3lfs \e[92mOK\e[m\n", trender);
