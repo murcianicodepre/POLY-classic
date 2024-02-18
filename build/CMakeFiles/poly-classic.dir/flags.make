@@ -6,5 +6,5 @@ CXX_DEFINES = -DYAML_CPP_STATIC_DEFINE
 
 CXX_INCLUDES = -I/home/diego/Escritorio/TFG/POLY-classic/build/../include
 
-CXX_FLAGS = -fopenmp
+CXX_FLAGS =  -g -fopenmp
 

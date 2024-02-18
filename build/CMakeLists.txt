@@ -10,6 +10,7 @@ find_package(yaml-cpp)          # Parse scene script
 find_package(OpenMP REQUIRED)   # OpenMP
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "..")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")    # Debug
 set(CMAKE_CXX_STANDARD 17)
 
 set(SOURCES                 # Set program sources

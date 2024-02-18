@@ -3,8 +3,10 @@
     Diego Párraga Nicolás ~ diegojose.parragan@um.es
 */
 
-#include "poly-classic.h"
+#include "../include/poly-classic.h"
 using namespace std;
+
+std::vector<std::string> parsermsg;
 
 /* Cpu arch code */
 const char* getCpuCode(){
@@ -22,6 +24,16 @@ const char* getCpuCode(){
     memcpy(vendor + 8, &ecx, 4);
     vendor[12] = '\0';
     return vendor[0] == 'G' ? "\e[1;94mx86-64" : "\e[1;91mamd64";
+}
+
+/* Print intro */
+void printIntro(){
+    system("clear");
+    printf(" \e[1;91m▄▄▄   \e[92m▄▄   \e[94m▄  \e[95m▄   ▄ \n");
+    printf(" \e[91m█  █ \e[92m█  █  \e[94m█   \e[95m█ █  \e[93m ▄▄ ▄   ▄   ▄▄  ▄▄ ▄  ▄▄\n");
+    printf(" \e[91m█▀▀  \e[92m█  █  \e[94m█    \e[95m█  \e[93m █   █  █▄█ ▀▄  ▀▄  █ █\n");
+    printf(" \e[91m█    \e[92m▀▄▄▀  \e[94m█▄▄  \e[95m█   \e[93m▀▄▄ █▄ █ █ ▄▄▀ ▄▄▀ █ ▀▄▄\n");
+    printf("\e[91m         - diegojose.parragan@um.es -\n\e[0m\n");
 }
 
 /* Main vector class */
@@ -127,7 +139,8 @@ RGBA* loadPNG(const char* path){
     png_destroy_read_struct(&png, &info, NULL);
 
     if(fclose(input)==-1){ printf("\e[1;91m  err closing '%s'!\n\e[0m", path); exit(EXIT_FAILURE); }
-    printf("\e[1;93m  loaded texture '%s'\e[0m\n", path);
+    printf("\e[1;93m   loaded texture '%s'\e[0m\n", path);
+    parsermsg.push_back("\e[1;93m   loaded texture '" + string(path) + "'\e[0m\n");
     
     return texture;
 }
@@ -183,12 +196,12 @@ public:
 class Camera {
 public:
     V3f ori;
-    float ar, fov, rx, ry, rz;
-    Camera() : ori(), ar(AR), fov(FOV * ALPHA), rx(0.0f), ry(0.0f), rz(0.0f) {}
-    Camera(V3f ori, float ar, float fov) : ori(ori), ar(ar), fov(fov*ALPHA), rx(0.0f), ry(0.0f), rz(0.0f) {}
+    float fov, rx, ry, rz;
+    Camera() : ori(), fov(FOV * ALPHA), rx(0.0f), ry(0.0f), rz(0.0f) {}
+    Camera(V3f ori, float fov) : ori(ori), fov(fov*ALPHA), rx(0.0f), ry(0.0f), rz(0.0f) {}
     Ray rayTo(int x, int y){
         float aux = tanf(fov / 2.0f);
-        float px = (2.0f * ((x + 0.5f)/WIDTH) - 1.0f) * aux * ar;
+        float px = (2.0f * ((x + 0.5f)/WIDTH) - 1.0f) * aux * AR;
         float py = (1.0f - (2.0f * (y + 0.5f)/HEIGHT)) * aux;
 
         V3f dir = V3f(px, py, 1.0f);
@@ -243,8 +256,11 @@ class Tri {
 public:
     Vertex a, b, c;
     uint matId;         // Material index for this Tri
-    Tri() : a(), b(), c() {}
-    Tri(Vertex a, Vertex b, Vertex c) : a(a), b(b), c(c) {}
+    V3f centroid;       // Centroid for BVH
+    uint8_t flags;      // Rendering flags
+
+    Tri() : a(), b(), c(), matId(0u), centroid() {}
+    Tri(Vertex a, Vertex b, Vertex c) : a(a), b(b), c(c), matId(0u), centroid((a.vector+b.vector+c.vector)*0.33333f) {}
     bool intersect(Ray ray, Hit& hit){
         V3f edge1 = b.vector - a.vector, edge2 = c.vector - a.vector, h = cross(ray.dir, edge2);
 
@@ -271,83 +287,303 @@ public:
     void scale(float s){ a.scale(s); b.scale(s); c.scale(s); }
     void scale(V3f s){ a.scale(s); b.scale(s); c.scale(s); }
     void rotate(V3f r){ a.rotate(r); b.rotate(r); c.rotate(r); }
+    string toString(){
+        return "{" + a.toString() + ", " + b.toString() + ", " + c.toString() + "}";
+    }
+};
+
+/*  Poly class */
+class Poly{
+public:
+    vector<Tri> tris;
+    Poly() {}
+    Poly(const char* path, uint matId, uint8_t flags = 0u){
+        char line[64], element[32];
+        float x, y, z, u, v;
+        Vertex a, b, c;
+        int nvertex, nfaces;
+
+        ifstream input; input.open(path, fstream::in);
+        if(!input.is_open()){ printf("\e[1;91m   err opening '%s'\e[0m\n", path); exit(EXIT_FAILURE); }
+
+        // Read vertex and face number
+        for(int i=0; i<12; i++){
+            input.getline(line, 64);
+            stringstream iss(line);
+            if(i==3){ iss >> element; iss >> element; iss >> element; nvertex = stoi(element); }
+            if(i==9){ iss >> element; iss >> element; iss >> element; nfaces = stoi(element); }
+        }
+
+        // Read vertex data and store in temporal array
+        Vertex* vertices = (Vertex*) malloc(sizeof(Vertex) * nvertex);
+        for(uint i=0; i<nvertex; i++){
+            input.getline(line, 64);
+            stringstream iss(line);
+            iss >> element; x = stof(element);
+            iss >> element; y = stof(element);
+            iss >> element; z = stof(element);
+            iss >> element; u = stof(element);
+            iss >> element; v = stof(element);
+            
+            vertices[i] = BLENDER ? Vertex(x, z, y, u, 1.0f-v) : Vertex(x, y, z, u, v);
+        }
+
+        // Create tris
+        tris = vector<Tri>();
+        for(uint i=0; i<nfaces; i++){
+            input.getline(line, 64);
+            stringstream iss(line); iss >> element;
+            iss >> element; a = vertices[stoi(element)];
+            iss >> element; b = vertices[stoi(element)];
+            iss >> element; c = vertices[stoi(element)];
+
+            // iss >> element; flags = individual tri rendering flags
+            // iss >> element; matId = individual tri material
+
+            Tri t = BLENDER ? Tri(a, c, b) : Tri(a, b, c); t.flags = flags; t.matId = matId;
+            tris.push_back(t);
+        }
+        free(vertices);
+        input.close();
+        if(input.is_open()){ printf("\e[1;91m   err closing '%s'\e[0m\n", path); exit(EXIT_FAILURE); }
+
+        printf("\e[1;93m   loaded %d tris from '%s'\e[0m\n", nfaces, path);
+        parsermsg.push_back(("\e[1;93m   loaded " + to_string(tris.size()) + " tris from '" + string(path) + "'\e[0m\n"));
+    }
+    void move(V3f m){
+        #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+        for(Tri* t=tris.data(); t<&(*tris.end()); t++) t->move(m);
+    }
+    void scale(V3f s){
+        #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+        for(Tri* t=tris.data(); t<&(*tris.end()); t++) t->scale(s);
+    }
+    void scale(float s){
+        #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+        for(Tri* t=tris.data(); t<&(*tris.end()); t++) t->scale(s);
+    }
+    void rotate(V3f r){
+        #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+        for(Tri* t=tris.data(); t<&(*tris.end()); t++) t->rotate(r);
+    }
+    void rotateX(float r){
+        #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+        for(Tri* t=tris.data(); t<&(*tris.end()); t++) t->rotate(V3f(r, 0.0f, 0.0f));
+    }
+    void rotateY(float r){
+        #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+        for(Tri* t=tris.data(); t<&(*tris.end()); t++) t->rotate(V3f(0.0f, r, 0.0f));
+    }
+    void rotateZ(float r){
+        #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+        for(Tri* t=tris.data(); t<&(*tris.end()); t++) t->rotate(V3f(0.0, 0.0f, r));
+    }
+};
+
+/* BHV acceleration structure 
+https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/
+*/
+class BVHNode{
+    V3f aabbMin, aabbMax;
+    uint leftOrFirstTri, ntris; 
 };
 
 /* Renderer constructor */
 PolyRenderer::PolyRenderer(){
     frame = (RGBA*) malloc(sizeof(RGBA) * WIDTH * HEIGHT);
     memset((void*) frame, 0, sizeof(RGBA*) * WIDTH * HEIGHT);
-    tris = 0; mats = 0;
+    tris = vector<Tri>(); mats = vector<Material>();
 }
 
 PolyRenderer::~PolyRenderer(){
     free(frame);
-    if(tris) free(tris);
-    if(mats) free(mats);
 }
+
+/* Parse V3f from Node */
+V3f parseV3f(YAML::Node node){
+    if(node.IsSequence() && node.size()==3){
+        return V3f(node[0].as<float>(), node[1].as<float>(), node[2].as<float>());
+    } else throw runtime_error("\e[1;91m err parsing V3f\e[0m\n");
+}
+
+/* Parse RGB or RGBA */
+RGBA parseColor(YAML::Node node){
+    if(node.IsSequence() && node.size()>2){
+        return RGBA(node[0].as<uint16_t>(), node[1].as<uint16_t>(), node[2].as<uint16_t>(), node[3] ? node[3].as<uint16_t>() : 255u);
+    } else throw runtime_error("\e[1;91m err parsing RGBA\e[0m\n");
+}
+
+/* Parse rendering flags from Node */
+uint8_t parseFlag(YAML::Node node){
+    string flag = node.as<string>();
+    if(flag=="DISABLE_RENDERING")
+        return DISABLE_RENDERING;
+    if(flag=="DISABLE_SHADING")
+        return DISABLE_SHADING;
+    if(flag=="DISABLE_TEXTURES")
+        return DISABLE_TEXTURES;
+    if(flag=="DISABLE_BUMP")
+        return DISABLE_BUMP;
+    
+    printf("\e[1;91m err unknown rendering flag '%s'\e[0m\n", flag.c_str()); return 0u;
+}
+
+
 
 /* Load scene from .poly script */
 bool PolyRenderer::loadScene(const char* path){
 
-    vector<Tri> trivec;
-    vector<Material> matvec;
+    printf("\e[1;93m compiling '\e[95m%s\e[93m'\e[0m\n", path);
 
-    cam = new Camera(V3f(0.0f, 0.0f, 0.0f), 4.0f/3.0f, 90.0f);
+    tris.clear(); mats.clear();
 
-    Tri t = Tri(Vertex(0.0f, 0.0f, 0.0f, 0.0f, 1.0f), Vertex(0.0f, 1.0f, 0.0f, 0.0f, 0.0f), Vertex(1.0f, 0.0f, 0.0f, 1.0f, 1.0f));
-    t.matId = 0;
-    t.move(V3f(-0.5f, 0.0f, 1.2f));
-    trivec.push_back(t);
+    string script_path = filesystem::path(path).parent_path(); script_path += "/";
+    try{
+        YAML::Node file = YAML::LoadFile(path);
+        vector<string> mats_names, objs_names;
+        vector<Poly> polys;
 
-    t = Tri(Vertex(0.0f, 1.0f, 0.0f, 0.0f, 0.0f), Vertex(1.0f, 1.0f, 0.0f, 1.0f, 0.0f), Vertex(1.0f, 0.0f, 0.0f, 1.0f, 1.0f));
-    t.matId = 0;
-    t.move(V3f(-0.5f, 0.0f, 1.2f));
-    trivec.push_back(t);
+        // Parse camera
+        if(file["camera"]){
+            YAML::Node camera = file["camera"];
+            V3f pos = parseV3f(camera["position"]);
+            float fov = camera["fov"].as<float>();
+            cam = new Camera(pos, fov);
+        } else { printf("\e[1;91m err parsing scene: camera missing!\e[0m\n"); return false; }
 
-    Material m = Material(2.0f, 32.0f);
-    m.loadTexture("demo/beso.png");
-    matvec.push_back(m);
+        // Parse materials and store material name for object declaration
+        if(file["materials"]){
+            YAML::Node mats = file["materials"];
+            for(const auto& m : mats){
+                if(m["name"] && m["diffuse"] && m["specular"]){
+                    string mat_name = m["name"].as<string>();
+                    float diff = m["diffuse"].as<float>(), spec = m["specular"].as<float>();
+                    Material mat = Material(diff, spec);
+                    if(m["texture"]) mat.loadTexture((script_path + m["texture"].as<string>()).c_str()); 
+                    else if(m["color"]) mat.color = parseColor(m["color"]);
+                    else { printf("\e[1;91m err parsing material: texture or color missing!\e[0m\n"); return false; }
+                    if(m["normal"]) mat.loadNormal((script_path + m["normal"].as<string>()).c_str());
 
-    // Copy data to renderer
-    N_TRIS = trivec.size(); N_MATS = matvec.size();
-    tris = (Tri*) malloc(sizeof(Tri)*N_TRIS); copy(trivec.begin(), trivec.end(), tris);
-    mats = (Material*) malloc(sizeof(Material)*N_MATS); copy(matvec.begin(), matvec.end(), mats);
+                    // Push material and name at same index
+                    this->mats.push_back(mat);
+                    mats_names.push_back(mat_name);
+                } else { printf("\e[1;91m err parsing material: attributes missing!\e[0m\n"); return false; }
+            }
+        } else { printf("\e[1;91m err parsing scene: materials missing!\e[0m\n"); return false; }
 
-    printf("\e[1;93m loading '\e[95m%s\e[93m' \e[92mOK\e[0m\n", path);
+        // Parse objects and store object name
+        if(file["objects"]){
+            YAML::Node objs = file["objects"];
+            for(const auto& obj : objs){
+                if(obj["name"] && obj["file"] && obj["material"]){
+                    string obj_name = obj["name"].as<string>(), obj_file = script_path + obj["file"].as<string>(), obj_mat = obj["material"].as<string>();
 
+                    // Get material index from name
+                    auto it = find_if(mats_names.begin(), mats_names.end(),
+                        [&obj_mat](const string& s){ return s==obj_mat; }
+                    ); 
+                    if(it==mats_names.end()) { printf("\e[1;91m err parsing object: undeclared material!\e[0m\n"); return false; }
+                    
+                    // Parse rendering flags
+                    uint8_t obj_flags = 0u;
+                    YAML::Node flags = obj["flags"];
+                    if(flags)
+                        for(auto f : flags)
+                            obj_flags |= parseFlag(f);
+
+                    Poly poly = Poly(obj_file.c_str(), distance(mats_names.begin(), it), obj_flags);
+                    if(obj["transforms"])
+                        for(const auto& t : obj["transforms"]){
+                            string op = t.first.as<string>();
+                            if(op=="scale"){
+                                    if(t.second.IsSequence())
+                                        poly.scale(parseV3f(t.second));
+                                    else poly.scale(t.second.as<float>());
+                                } else if(op=="rotate") poly.rotate(parseV3f(t.second));
+                                else if(op=="move")
+                                    poly.move(parseV3f(t.second));
+                                else printf("\e[1;94m unknown transform '%s'\e[0m\n", op.c_str());
+                        }
+                    
+                    // Insert object and object name in vector
+                    polys.push_back(poly);
+                    objs_names.push_back(obj_name);
+
+
+                } else { printf("\e[1;91m err parsing object: attributes missing!\e[0m\n"); return false; }
+            }
+        } else { printf("\e[1;91m err parsing scene: objects missing!\e[0m\n"); return false; }
+
+        // Once scene parsing is complete, tri data is copied to the internal tri vector
+        for(const auto& p : polys)
+            tris.insert(tris.end(), p.tris.begin(), p.tris.end()); 
+
+    } catch (const YAML::ParserException& pe){ printf("\e[1;91m exception while parsing '\e[95m%s\e[93m': %s\e[0m\n", path, pe.msg.c_str()); return false; }
+
+    // Nice printing
+    system("clear");
+    printIntro();
+    printf("\e[1;93m compiling '\e[95m%s\e[93m' \e[92mOK\e[0m\n", path);
+    for(auto s : parsermsg) { printf("%s", s.c_str());}
     return true;
 }
 
-/* Pixel shader: given a hit and a Tri, compute pixel color */
+/* Pixel shader: given a hit and a Tri, compute hit color */
 RGBA PolyRenderer::pixel_shader(Hit& hit, uint triId){
     RGBA out;
 
-    int tx = hit.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
-    int ty = hit.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
-
     Tri tri = tris[triId];
-    
-    out = mats[tri.matId].texture[tx + ty*TEXTURE_SIZE];
 
+    // Texture mapping step: returns RGBA
+    if(!(tri.flags & DISABLE_TEXTURES) && tri.matId<mats.size()){
+        if(mats[tri.matId].texture){
+            int tx = hit.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
+            int ty = hit.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
+            out = mats[tri.matId].texture[tx + ty*TEXTURE_SIZE];
+        } else out = mats[tri.matId].color;
+    } else out = RGBA(255,0,255,255);   // No texture default
+
+    // TODO: bump mapping step
+    if(!(tri.flags & DISABLE_BUMP)){
+
+    }
+
+    // TODO: Shading step
+    if(!(tri.flags & DISABLE_SHADING)){
+
+    }
+    
     return out;
 }
 
-/* Intersection shader: compute scene intersection for pixel x,y */
-RGBA PolyRenderer::intersection_shader(int x, int y){
-    RGBA out;
+/* Intersection shader: compute scene intersection for pixel x,y and return pixel color */
+RGBA PolyRenderer::intersection_shader(uint x, uint y){
+    RGBA out, ps;
     Ray ray = cam->rayTo(x, y);
     Hit hit;
     
     float z = 1000.0f;
-    for(uint i=0; i<N_TRIS; i++){
+    for(uint i=0; i<tris.size(); i++){
         Tri tri = tris[i];
-        if(tri.intersect(ray, hit) && hit.vector.z<=z){
-            z = hit.vector.z;
-            out = pixel_shader(hit, i);
+        if(tri.intersect(ray, hit) && hit.vector.z<=z && !(tri.flags & DISABLE_RENDERING)){
+            // Get pixel shader result
+            ps = pixel_shader(hit, i);
+
+            // Update depth only if pixel shader output is a solid color
+            if(ps.a==255){ z = hit.vector.z; out = RGBA(); }
+            float transparency = ps.a==255 ? 1.0f : static_cast<float>(ps.a)/255.0f;
+
+            // Compute pixel color
+            out = ps * transparency + out;
         }
     }
 
     return out;
+}
+
+/* Fast intersection shader: intersection shader using BVH structures */
+RGBA PolyRenderer::fast_intersection_shader(uint x, uint y){
+    return RGBA(0,0,0,0);
 }
 
 /* Render loaded scene */
@@ -358,7 +594,7 @@ bool PolyRenderer::render(uint threads){
     printf("\e[1;93m rendering ");
 
     tini = static_cast<float>(omp_get_wtime());
-    #pragma omp parallel for collapse(2) shared(frame) num_threads(threads) schedule(static) shared(tris, mats)
+    #pragma omp parallel for collapse(2) shared(frame, tris, mats) num_threads(threads) schedule(dynamic)
         for(int y=0; y<HEIGHT; y++)
             for(int x=0; x<WIDTH; x++)
                 frame[x + y*WIDTH] = intersection_shader(x, y);

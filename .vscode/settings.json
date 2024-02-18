@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.poly": "yaml",
+        "tuple": "cpp",
+        "chrono": "cpp"
+    }
+}

@@ -14,6 +14,7 @@
 #include <cmath>
 #include <list>
 #include <vector>
+#include <tuple>
 #include <string>
 #include <cstring>
 #include "png.h"
@@ -26,7 +27,12 @@
 #define TEXTURE_SIZE 1024
 #define FOV 60.0f
 #define AR 1.333333333f
-#define BLENDER false
+#define BLENDER true
+#define DISABLE_RENDERING 0x01u
+#define DISABLE_SHADING 0x02u
+#define DISABLE_TEXTURES 0x04u
+#define DISABLE_BUMP 0x8u
+// Implicit RENDER flag; if flags <= 0 (no flags), render disabled
 
 // Math defs
 #define PI 3.14159265f
@@ -41,25 +47,25 @@ class Material;
 class Vertex;
 typedef Vertex Hit;
 
+// Other functions
+const char* getCpuCode();
+void printIntro();
+
 // Main renderer class
 class PolyRenderer{
 public:
-    RGBA* frame;
-    Camera* cam;
-    Material* mats;
-    Tri* tris;
-
+    RGBA* frame;                    // Rendering buffer
+    Camera* cam;                    // Scene camera
+    std::vector<Tri> tris;          // Tri data
+    std::vector<Material> mats;     // Material data
     PolyRenderer();
     ~PolyRenderer();
-    bool loadScene(const char* path);
+    bool loadScene(const char* scene);
     bool render(uint threads);
     void save(const char* path);
-
-private:
-    uint N_TRIS, N_MATS;
-
-    RGBA intersection_shader(int x, int y);
-    RGBA pixel_shader(Hit &hit, uint triId);
+    RGBA intersection_shader(uint x, uint y);
+    RGBA fast_intersection_shader(uint x, uint y);  // Using BVH
+    RGBA pixel_shader(Hit& hit, uint triId);
 };
 
 #endif

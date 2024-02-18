@@ -4,6 +4,7 @@
 */
 
 #include <iostream>
+#include <cstdlib>
 #include "poly-classic.h"
 using namespace std;
 
@@ -12,14 +13,6 @@ void printUsage(){
     printf("\e[1;93m Usage: \e[91mp\e[92mo\e[94ml\e[95my \e[93mclassic \e[95mSCENE.POLY \e[96m [THREADS]\e[0m\n");
 }
 
-/* Print intro */
-void printIntro(){
-    printf(" \e[1;91m▄▄▄   \e[92m▄▄   \e[94m▄  \e[95m▄   ▄ \n");
-    printf(" \e[91m█  █ \e[92m█  █  \e[94m█   \e[95m█ █  \e[93m ▄▄ ▄   ▄   ▄▄  ▄▄ ▄  ▄▄\n");
-    printf(" \e[91m█▀▀  \e[92m█  █  \e[94m█    \e[95m█  \e[93m █   █  █▄█ ▀▄  ▀▄  █ █\n");
-    printf(" \e[91m█    \e[92m▀▄▄▀  \e[94m█▄▄  \e[95m█   \e[93m▀▄▄ █▄ █ █ ▄▄▀ ▄▄▀ █ ▀▄▄\n");
-    printf("\e[91m         - diegojose.parragan@um.es -\n\e[0m\n");
-}
 
 /* Main function */
 int main(int argc, char** argv){
