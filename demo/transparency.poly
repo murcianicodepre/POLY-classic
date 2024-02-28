@@ -1,0 +1,31 @@
+camera:
+  position: [0.0, 0.0, 0.0]
+  fov: 45.0
+materials:
+  - name: "demo_mat"
+    texture: "textures/demo_texture.png"
+    diffuse: 2.0
+    specular: 32.0
+  - name: "alpha_mat"
+    color: [255,0,0,200]
+    diffuse: 2.0
+    specular: 32.0
+objects:
+  - name: "quad2"
+    file: "models/quad.ply"
+    material: "alpha_mat"
+    transforms:
+      scale: 0.5
+      move: [0.0, 0.0, 1.9999999]
+  - name: "quad1"
+    file: "models/quad.ply"
+    material: "demo_mat"
+    transforms:
+      scale: 0.5
+      move: [0.0, 0.0, 2.0]
+  
+  
+lights:
+  - position: [0.0, 0.0, 0.0]
+    color: [255,255,255]
+    intensity: 1.0  

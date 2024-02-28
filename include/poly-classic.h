@@ -22,8 +22,8 @@
 #include "yaml-cpp/exceptions.h"
 
 // Render pipeline defs
-#define WIDTH 1024
-#define HEIGHT 768
+#define WIDTH 1280
+#define HEIGHT 960
 #define TEXTURE_SIZE 1024
 #define FOV 60.0f
 #define AR 1.333333333f
@@ -32,7 +32,6 @@
 #define DISABLE_SHADING 0x02u
 #define DISABLE_TEXTURES 0x04u
 #define DISABLE_BUMP 0x8u
-// Implicit RENDER flag; if flags <= 0 (no flags), render disabled
 
 // Math defs
 #define PI 3.14159265f
@@ -42,14 +41,20 @@
 // Incomplete classes 
 class RGBA;
 class Camera;
+class Light;
 class Tri;
 class Material;
 class Vertex;
-typedef Vertex Hit;
+class Hit;
+class Ray;
+
+typedef unsigned int uint;
+
 
 // Other functions
 const char* getCpuCode();
 void printIntro();
+void polymsg(std::string msg);
 
 // Main renderer class
 class PolyRenderer{
@@ -58,14 +63,16 @@ public:
     Camera* cam;                    // Scene camera
     std::vector<Tri> tris;          // Tri data
     std::vector<Material> mats;     // Material data
+    std::vector<Light> lights;      // Scene light data
     PolyRenderer();
     ~PolyRenderer();
     bool loadScene(const char* scene);
     bool render(uint threads);
     void save(const char* path);
-    RGBA intersection_shader(uint x, uint y);
-    RGBA fast_intersection_shader(uint x, uint y);  // Using BVH
-    RGBA pixel_shader(Hit& hit, uint triId);
+    RGBA compute_pixel(uint x, uint y);
+    bool intersection_shader(Ray&, Hit&);
+    RGBA fragment_shader(Hit&);
+    RGBA texture_shader(Hit& hit);
 };
 
 #endif

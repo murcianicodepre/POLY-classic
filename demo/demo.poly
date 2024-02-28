@@ -9,9 +9,10 @@ camera:
 # Declare materials with names
 materials:
   - name: "cube_mat"
-    texture: "textures/demo_texture.png"
+    texture: "textures/beso.png"
     diffuse: 2.0
     specular: 32.0
+    reflective: 0.5
   - name: "sky_mat"
     texture: "textures/sky1.png"
     diffuse: 2.0
@@ -23,19 +24,19 @@ materials:
 
 # Declare objects with names
 objects:
-  - name: "cube"
-    file: "models/cube.ply"
-    material: "cube_mat"
-    transforms:
-      scale: 0.5
-      rotate: [-20.0, 45.0, 0]
-      move: [0.0, 0.0, 1.0]
   - name: "sky"
     file: "models/sky.ply"
     material: "sky_mat"
     flags:
       - DISABLE_SHADING
     transforms:
+      move: [0.0, 0.0, 1.0]
+  - name: "cube"
+    file: "models/cube.ply"
+    material: "cube_mat"
+    transforms:
+      scale: 0.5
+      rotate: [-20.0, 45.0, 0]
       move: [0.0, 0.0, 1.0]
   - name: "floor"
     file: "models/quad.ply"
@@ -44,6 +45,9 @@ objects:
       scale: 1.5
       rotate: [90.0, 0.0, 0.0]
       move: [0.0, -0.4, 1.5]
+
+  
+  
 
 # Declare world lighting 
 lights:

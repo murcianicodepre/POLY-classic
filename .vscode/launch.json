@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/poly-classic",
-            "args": ["demo/demo.poly", "1"],
+            "args": ["-i=demo", "-t=1", "-o="],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
