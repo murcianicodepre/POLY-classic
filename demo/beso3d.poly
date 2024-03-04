@@ -6,19 +6,19 @@ camera:
 materials:
   # jo material
   - name: "cube_mat"
-    texture: "models/cube/beso.png"
+    texture: "textures/beso.png"
     diffuse: 2.0
     specular: 32.0
 
   # sky material
   - name: "sky_mat"
-    texture: "skybox/sky2.png"
+    texture: "textures/sky2.png"
     diffuse: 2.0
     specular: 32.0
 
   # floor material
   - name: "floor_mat"
-    texture: "models/cube/cube_texture.png"
+    texture: "textures/cube_texture.png"
     diffuse: 2.0
     specular: 32.0
 

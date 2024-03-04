@@ -1,28 +1,34 @@
-# POLY classic scene description demo v2
-# Diego Párraga Nicolás 
+# demo.poly ~ demo scene for poly-classic
+# Diego Párraga Nicolás ~ diegojose.parragan@um.es
 
-# Declare camera
 camera:
-  position: [0.0, 0.0, -0.2]
-  fov: 50.0
+  position: [0.0, 0.1, -0.5]
+  fov: 30.0
 
-# Declare materials with names
 materials:
-  - name: "cube_mat"
-    texture: "textures/beso.png"
-    diffuse: 2.0
-    specular: 32.0
-    reflective: 0.5
   - name: "sky_mat"
+    diffuse: 2.0
+    specular: 32.0
     texture: "textures/sky1.png"
+  - name: "pc_mat"
     diffuse: 2.0
     specular: 32.0
+    texture: "textures/ibm5110_texture.png"
+  - name: "screen_mat"
+    diffuse: 2.0
+    specular: 32.0
+    texture: "textures/ibm5110_screen_texture.png"
+    reflective: 0.3
   - name: "floor_mat"
-    texture: "textures/floor_texture.png"
     diffuse: 2.0
     specular: 32.0
+    texture: "textures/floor_texture.png"
+    reflective: 0.5
+  - name: "poly_mat"
+    diffuse: 2.0
+    specular: 32.0
+    texture: "textures/poly_texture.png"
 
-# Declare objects with names
 objects:
   - name: "sky"
     file: "models/sky.ply"
@@ -30,27 +36,40 @@ objects:
     flags:
       - DISABLE_SHADING
     transforms:
-      move: [0.0, 0.0, 1.0]
-  - name: "cube"
-    file: "models/cube.ply"
-    material: "cube_mat"
+      scale: 3.0
+      move: [0.0, 0.0, 2.2]
+  - name: "pc"
+    file: "models/ibm5110.ply"
+    material: "pc_mat"
     transforms:
-      scale: 0.5
-      rotate: [-20.0, 45.0, 0]
-      move: [0.0, 0.0, 1.0]
+      scale: 0.3
+      #rotate: [-20.0, 30.0, -30.0]
+      rotate: [0.0, 20.0, 0.0]
+      move: [0.2, -0.2, 1.7]
+  - name: "screen"
+    file: "models/ibm5110_screen.ply"
+    material: "screen_mat"
+    transforms:
+      scale: 0.3
+      #rotate: [-20.0, 30.0, -30.0]
+      rotate: [0.0, 20.0, 0.0]
+      move: [0.2, -0.2, 1.7]
   - name: "floor"
     file: "models/quad.ply"
     material: "floor_mat"
     transforms:
-      scale: 1.5
+      scale: 3.0
       rotate: [90.0, 0.0, 0.0]
-      move: [0.0, -0.4, 1.5]
+      move: [0.0, -0.2, 2.0]
+  - name: "poly"
+    file: "models/poly.ply"
+    material: "poly_mat"
+    transforms:
+      scale: 0.27
+      rotate: [0.0, -10.0, 30.0]
+      move: [-0.18, 0.084 , 1.8]
 
-  
-  
-
-# Declare world lighting 
 lights:
   - position: [0.6, 1.0, -1.0]
-    color: [255, 255, 255]
-    intensity: 0.8
+    color: [255,255,255]
+    intensity: 0.6 

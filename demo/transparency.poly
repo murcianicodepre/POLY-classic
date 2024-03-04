@@ -16,7 +16,7 @@ objects:
     material: "alpha_mat"
     transforms:
       scale: 0.5
-      move: [0.0, 0.0, 1.9999999]
+      move: [0.0, 0.0, 1.5]
   - name: "quad1"
     file: "models/quad.ply"
     material: "demo_mat"

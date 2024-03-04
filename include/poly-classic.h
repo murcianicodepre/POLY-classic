@@ -27,11 +27,14 @@
 #define TEXTURE_SIZE 1024
 #define FOV 60.0f
 #define AR 1.333333333f
+#define MAX_REFLECTIONS 8u
+#define MAX_REFRACTIONS 8u
 #define BLENDER true
 #define DISABLE_RENDERING 0x01u
 #define DISABLE_SHADING 0x02u
 #define DISABLE_TEXTURES 0x04u
 #define DISABLE_BUMP 0x8u
+#define ENABLE_BACKFACE_CULLING 0x10u
 
 // Math defs
 #define PI 3.14159265f
@@ -70,9 +73,10 @@ public:
     bool render(uint threads);
     void save(const char* path);
     RGBA compute_pixel(uint x, uint y);
-    bool intersection_shader(Ray&, Hit&);
+    bool intersection_shader(Ray&, Hit&, bool = false);
     RGBA fragment_shader(Hit&);
     RGBA texture_shader(Hit& hit);
+    RGBA reflection_shader(Ray&, Hit&, uint);
 };
 
 #endif

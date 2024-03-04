@@ -85,7 +85,7 @@ public:
     void clamp255(){ r = r>255 ? 255 : r; g = g>255 ? 255 : g; b = b>255 ? 255 : b; a = a>255 ? 255 : a; }
     RGBA operator+ (RGBA color) { RGBA out = RGBA(r+color.r, g+color.g, b+color.b, a+color.a); out.clamp255(); return out; }
     RGBA operator- (RGBA color) { RGBA out = RGBA(r-color.r, g-color.g, b-color.b, a-color.a); out.clamp255(); return out; }
-    RGBA operator* (float f) { RGBA out = RGBA(static_cast<uint16_t>(r*f), static_cast<uint16_t>(g*f), static_cast<uint16_t>(b*f), static_cast<uint16_t>(a*f)); out.clamp255(); return out; }
+    RGBA operator* (float f) { RGBA out = RGBA(static_cast<uint16_t>(r*f), static_cast<uint16_t>(g*f), static_cast<uint16_t>(b*f), a); out.clamp255(); return out; }
     RGBA operator* (V3f v) { RGBA out = RGBA(static_cast<uint16_t>(r*v.x), static_cast<uint16_t>(g*v.y), static_cast<uint16_t>(b*v.z), a); out.clamp255(); return out; }
 };
 
@@ -223,7 +223,7 @@ public:
     void setRotX(float r){ rx = r; }
     void setRotY(float r){ ry = r; }
     void setRotZ(float r){ rz = r; }
-    void setRot(V3f r){ rz = r.z; ry = ry; rx = r.x; }
+    void setRot(V3f r){ rz = r.z; ry = r.y; rx = r.x; }
 };
 
 /* Light class */
@@ -258,23 +258,23 @@ public:
 /* Hit record: hit info */
 class Hit{
 public:
-    Vertex hit;
+    Vertex point;
     V3f normal;
     uint triId;
     Hit(){}
-    Hit(Vertex hit, V3f normal, uint triId) : hit(hit), normal(normal), triId(triId) {}
+    Hit(Vertex point, V3f normal, uint triId) : point(point), normal(normal), triId(triId) {}
 };
 
 /* Material class */
 class Material{
 public:
-    RGBA* texture, * normal;
+    RGBA* texture, * bump;
     RGBA color;
     float diff, spec, reflective;
-    Material() : texture(NULL), normal(NULL), diff(0.0f), spec(0.0f), reflective(0.0f) {}
-    Material(float diff, float spec, float reflective) : texture(NULL), normal(NULL), diff(diff), spec(spec), reflective(reflective) {}
+    Material() : texture(NULL), bump(NULL), diff(0.0f), spec(0.0f), reflective(0.0f) {}
+    Material(float diff, float spec, float reflective) : texture(NULL), bump(NULL), diff(diff), spec(spec), reflective(reflective) {}
     void loadTexture(const char* path){ texture = loadPNG(path); }  // Load png as texture
-    void loadNormal(const char* path){ normal = loadPNG(path); }    // Load png as normal map
+    void loadBump(const char* path){ bump = loadPNG(path); }    // Load png as normal map
 };
 
 /* Tri class */
@@ -292,6 +292,7 @@ public:
 
         float A = dot(edge1, h);
         if(A>-EPSILON && A<EPSILON) return false;   // Ray parallel
+        if((flags&ENABLE_BACKFACE_CULLING) && A<0.0f) return false;
 
         V3f s = ray.ori - a.vector;
         float inv = 1.0f/A, U = inv * dot(s, h);
@@ -303,14 +304,10 @@ public:
 
         float t = inv * dot(edge2, q);
         if(t>EPSILON){  // Hit!
-            hit.hit.vector = ray.point(t);
-            hit.hit.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
-            hit.hit.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
-            hit.normal = cross((edge1 - ray.point(t)), (edge2 - ray.point(t))).normalize();
-            /*hit.vector = ray.point(t);
-            hit.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
-            hit.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
-            normal = cross((edge1 - ray.point(t)), (edge2 - ray.point(t))).normalize();*/
+            hit.point.vector = ray.point(t);
+            hit.point.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
+            hit.point.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
+            hit.normal = cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
             return true;
         } else return false;
     }
@@ -456,8 +453,9 @@ uint8_t parseFlag(YAML::Node node){
         return DISABLE_TEXTURES;
     if(flag=="DISABLE_BUMP")
         return DISABLE_BUMP;
-    
-    polymsg("\e[1;91m  err unknown rendering flag '" + string(flag) + "'\e[0m\n"); return 0u;
+    if(flag=="ENABLE_BACKFACE_CULLING")
+        return ENABLE_BACKFACE_CULLING;
+    polymsg("\e[1;96m  err unknown rendering flag '" + string(flag) + "'\e[0m\n"); return 0u;
 }
 
 
@@ -479,7 +477,9 @@ bool PolyRenderer::loadScene(const char* path){
             YAML::Node camera = file["camera"];
             V3f pos = parseV3f(camera["position"]);
             float fov = camera["fov"].as<float>();
+            V3f rot = camera["rotation"] ? parseV3f(camera["rotation"]) : V3f();
             cam = new Camera(pos, fov);
+            cam->setRot(rot);
         } else { polymsg("\e[1;91m  err parsing scene: camera missing\e[0m\n"); return false; }
 
         // Parse materials and store material name for object declaration
@@ -493,12 +493,11 @@ bool PolyRenderer::loadScene(const char* path){
                     if(m["texture"]) mat.loadTexture((script_path + m["texture"].as<string>()).c_str()); 
                     else if(m["color"]) mat.color = parseColor(m["color"]);
                     else { polymsg("\e[1;91m  err parsing material: texture or color missing!\e[0m\n"); return false; }
-                    if(m["normal"]) mat.loadNormal((script_path + m["normal"].as<string>()).c_str());
+                    if(m["normal"]) mat.loadBump((script_path + m["normal"].as<string>()).c_str());
 
                     // Push material and name at same index
                     this->mats.push_back(mat);
                     mats_names.push_back(mat_name);
-                //} else { printf("\e[1;91m err parsing material: attributes missing!\e[0m\n"); return false; }
                 } else { polymsg("\e[1;91m  err parsing material: attributes missing!\e[0m\n"); return false; }
             }
         } else { polymsg("\e[1;91m  err parsing scene: materials missing\e[0m\n"); return false; }
@@ -571,16 +570,118 @@ bool PolyRenderer::loadScene(const char* path){
 /* Texture shader: return texture element from u,v coordinates */
 RGBA PolyRenderer::texture_shader(Hit& hit){
     uint matId = tris[hit.triId].matId;
-    uint16_t tx = hit.hit.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
-    uint16_t ty = hit.hit.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
+    uint16_t tx = hit.point.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
+    uint16_t ty = hit.point.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
     return mats[matId].texture[tx + ty*TEXTURE_SIZE];
+}
+
+/* Reflection shader: compute n reflection */
+RGBA PolyRenderer::reflection_shader(Ray& ray, Hit& hit, uint n){
+    Material mat = mats[tris[hit.triId].matId];
+    RGBA fragment = fragment_shader(hit);
+    if(n<MAX_REFLECTIONS && mat.reflective>0.0f){
+        V3f rdir = ray.dir - hit.normal * (dot(ray.dir, hit.normal) * 2.0f);
+        Ray rray = Ray(hit.point.vector, rdir);
+        Hit rhit;
+        return intersection_shader(rray, rhit) ? fragment * (1.0f-mat.reflective) + reflection_shader(rray, rhit, n+1) * mat.reflective : fragment;
+    } else return fragment;
+}
+
+/* Fragment shader: main shading program */
+RGBA PolyRenderer::fragment_shader(Hit& hit){
+    RGBA out;
+    Tri tri = *(&tris[hit.triId]);
+
+    // Texture mapping step
+    RGBA texture;
+    if(!(tri.flags & DISABLE_TEXTURES) && tri.matId<mats.size()){
+        texture = mats[tri.matId].texture ? texture_shader(hit) : mats[tri.matId].color;
+    } else texture = RGBA(255,0,255,255);
+
+    // TODO: bump mapping step
+    if(!(tri.flags & DISABLE_BUMP)){
+        // hit.normal = bump mapping using material nomal map
+    }
+
+
+    // TODO: Blinn-Phong shading step
+    if(!(tri.flags & DISABLE_SHADING)){
+        // Take texture and compute blinn-phong shading
+        for(auto& l : lights){
+            if(l.intensity==0.0f) continue;
+
+            V3f ldir = (l.pos - hit.point.vector).normalize();
+            float dist = (l.pos - hit.point.vector).length();
+
+            // Shadow mapping step: check if fragment is shadowed
+            V3f sori = dot(ldir, hit.normal) < 0.0f ? hit.point.vector - hit.normal * 1e-3f : hit.point.vector + hit.normal * 1e-3f;
+            Ray lray = Ray(sori, ldir);
+            Hit hit2;
+            if(intersection_shader(lray, hit2, true) /*&& fragment_shader(hit2).a==255*/)
+                texture = texture*(1.0f - l.intensity);
+        }
+    }
+
+    // Compute final fragment color
+    out = texture;
+
+    return out;
+}
+
+/* Intersection shader: compute closest Tri hit */
+bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, bool NO_SHADING){
+    bool intersection = false;
+    float z = 1000.0f;
+    Hit aux;
+    for(uint i=0; i<tris.size(); i++){
+        Tri tri = tris[i];
+        if(NO_SHADING && tri.flags & DISABLE_SHADING) continue;
+        if(tri.intersect(ray, aux) && aux.point.vector.z<z){
+            hit = aux;
+            z = hit.point.vector.z;
+            hit.triId = i;
+            intersection = true;
+        }
+    }
+    return intersection;
 }
 
 /* Compute pixel: main pixel rendering entrypoint */
 RGBA PolyRenderer::compute_pixel(uint x, uint y){
     RGBA out;
+    Ray ray = cam->rayTo(x, y);
+    Hit hit;
+    uint reflectionRays = 0u, refractionRays = 0u;
 
+    // Intersection step: compute closest tri intersection
+    if(intersection_shader(ray, hit)){          
+        Tri tri = *(&tris[hit.triId]);
+        Material mat = *(&mats[tri.matId]);
 
+        // Fragment shading step: compute fragment base color
+        RGBA fragment = fragment_shader(hit);
+
+        // Reflection step: compute reflected color
+        if(!(tri.flags & DISABLE_SHADING) && mat.reflective>0.0f) fragment = reflection_shader(ray, hit, 0);
+
+        // Transparency step: if first intersection is translucent, start loop
+        if(fragment.a!=255){
+            out = fragment * (static_cast<float>(fragment.a) / 255.0f);
+            while(fragment.a!=255 && refractionRays<MAX_REFRACTIONS) {
+                Ray ray2 = Ray(hit.point.vector, ray.dir);
+                if(intersection_shader(ray2, hit)){
+                    fragment = fragment_shader(hit);
+                } else refractionRays = MAX_REFRACTIONS;
+                out = out + fragment*(static_cast<float>(fragment.a)/255.0f);
+                refractionRays++;
+            }
+        } else out = fragment;
+
+        // Final pixel color
+        out = fragment;
+    }
+    
+    // Return final pixel color
     return out;
 }
 
