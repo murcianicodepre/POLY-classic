@@ -1,0 +1,23 @@
+# Define camera
+camera:
+  position: [0.0, 0.0, -0.2]
+  fov: 50.0
+# Define materials
+materials:
+  - name: "mat1"
+    texture: "textures/poly_texture.png"
+    diffuse: 2.0
+    specular: 32.0
+# Define objects
+objects:
+  - name: "poly"
+    file: "models/poly.ply"
+    material: "mat1"
+    transforms:
+      scale: 0.4
+      move: [0.0, -0.1, 1.0]
+# Finally, define scene lights
+lights:
+  - position: [0.5, 1.0, -1.0]
+    color: [255,255,255]
+    intensity: 0.8

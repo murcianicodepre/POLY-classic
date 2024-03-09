@@ -2,6 +2,7 @@
     "files.associations": {
         "*.poly": "yaml",
         "tuple": "cpp",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "optional": "cpp"
     }
 }

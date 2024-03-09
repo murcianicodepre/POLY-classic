@@ -1,7 +1,9 @@
 # beso 3D ~ diegojose.parragan@um.es
+output: [1280,960]
+
 camera:
   position: [0.0, 0.0, -0.2]
-  fov: 45.0
+  fov: 50.0
 
 materials:
   # jo material
@@ -12,44 +14,47 @@ materials:
 
   # sky material
   - name: "sky_mat"
-    texture: "textures/sky2.png"
+    texture: "textures/sky1.png"
     diffuse: 2.0
     specular: 32.0
 
   # floor material
   - name: "floor_mat"
-    texture: "textures/cube_texture.png"
+    texture: "textures/water.png"
     diffuse: 2.0
     specular: 32.0
+    reflective: 0.5
 
 objects:
   # jo
-  - material: "cube_mat"
-    file: "models/cube/cube.ply"
+  - name: "cube"
+    material: "cube_mat"
+    file: "models/cube.ply"
     transforms:
-      scale: 0.5
-      rotateY: 45.0
-      rotateX: -20.0
+      scale: 0.4
+      rotate: [-20.0, 45.0, 0.0]
       move: [0.0, 0.0, 1.0]
-  
-
   # skybox
-  - material: "sky_mat"
-    file: "skybox/skybox.ply"
+  - name: "sky"
+    material: "sky_mat"
+    file: "models/sky.ply"
     flags:
       - DISABLE_SHADING
     transforms:
-      move: [0.0, 0.0, 1.0]
+      scale: 5.0
+      rotate: [0.0, -15.0, 0.0]
+      move: [0.0, 0.0, 3.0]
 
   # floor
-  - material: "floor_mat"
-    file: "models/quad/quad.ply"
+  - name: "floor"
+    material: "floor_mat"
+    file: "models/quad.ply"
     transforms:
-      scale: 1.5
-      rotateX: 90.0
-      move: [0.0, -0.4, 1.5]
+      scale: 5.0
+      rotate: [90.0, 0.0, 0.0]
+      move: [0.0, -0.3, 1.5]
 
 lights:
-  - position: [0.6, 1.0, -1.0]
+  - position: [0.5, 1.0, -1.0]
     color: [255, 255, 255]
     intensity: 0.8
