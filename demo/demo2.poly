@@ -13,6 +13,7 @@ materials:
     texture: "textures/demo_texture.png"
     diffuse: 2.0
     specular: 32.0
+    reflective: 0.5
   - name: "floor_mat"
     texture: "textures/water.png"
     diffuse: 2.0

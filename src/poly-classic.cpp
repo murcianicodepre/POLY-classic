@@ -286,7 +286,7 @@ public:
 class Hit{
 public:
     Vertex point;
-    V3f normal;
+    V3f normal, phongNormal;
     Ray ray;
     uint triId;
     Hit(){}
@@ -313,7 +313,7 @@ public:
     uint8_t flags;      // Rendering flags
 
     Tri(Vertex a, Vertex b, Vertex c, uint16_t matId, uint8_t flags) : a(a), b(b), c(c), matId(matId), flags(flags), centroid((a.vector+b.vector+c.vector)*0.33333f) {}
-    bool intersect(Ray ray, Hit& hit, bool interpolateNormal = true){
+    bool intersect(Ray ray, Hit& hit){
         V3f edge1 = b.vector - a.vector, edge2 = c.vector - a.vector, h = cross(ray.dir, edge2);
 
         float A = dot(edge1, h);
@@ -333,11 +333,11 @@ public:
             hit.point.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
             hit.point.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
 
-            hit.normal = interpolateNormal ? (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize() : cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
+            //hit.normal = interpolateNormal ? (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize() : cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
             
-            //hit.normal = (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize();
+            hit.phongNormal = (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize();
 
-            //hit.normal = cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
+            hit.normal = cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
             hit.ray = ray;
             return true;
         } else return false;
@@ -706,10 +706,10 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
             
             // Compute diffuse and specular components of the fragment
             half = (ldir + view).normalize();
-            float diff = max(0.0f, dot(hit.normal, ldir));
+            float diff = max(0.0f, dot(hit.phongNormal, ldir));
             V3f diffuse = (l.color.asV3f() * l.intensity) * (diff * mat.diff);
 
-            float spec = powf(max(0.0f, dot(hit.normal, half)), mat.spec);
+            float spec = powf(max(0.0f, dot(hit.phongNormal, half)), mat.spec);
             V3f specular = (l.color.asV3f() * l.intensity) * (spec * mat.spec);
 
             blinn_phong = blinn_phong + diffuse*att + specular*att;
