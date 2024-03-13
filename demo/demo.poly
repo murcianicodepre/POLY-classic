@@ -9,16 +9,11 @@ materials:
   - name: "sky_mat"
     diffuse: 2.0
     specular: 32.0
-    texture: "textures/sky1.png"
+    texture: "textures/sky2.png"
   - name: "pc_mat"
     diffuse: 2.0
     specular: 32.0
-    texture: "textures/ibm5110_texture.png"
-  - name: "screen_mat"
-    diffuse: 2.0
-    specular: 32.0
-    texture: "textures/ibm5110_screen_texture.png"
-    reflective: 0.3
+    texture: "textures/ibm5110.png"
   - name: "floor_mat"
     diffuse: 2.0
     specular: 32.0
@@ -37,18 +32,10 @@ objects:
       - DISABLE_SHADING
     transforms:
       scale: 3.0
-      rotate: [0.0, -15.0, 0.0]
       move: [0.0, 0.0, 2.2]
   - name: "pc"
     file: "models/ibm5110.ply"
     material: "pc_mat"
-    transforms:
-      scale: 0.3
-      rotate: [0.0, 20.0, 0.0]
-      move: [0.2, -0.2, 1.1]
-  - name: "screen"
-    file: "models/ibm5110_screen.ply"
-    material: "screen_mat"
     transforms:
       scale: 0.3
       rotate: [0.0, 20.0, 0.0]
@@ -60,11 +47,6 @@ objects:
       scale: 5.0
       rotate: [90.0, 0.0, 0.0]
       move: [0.0, -0.2, 2.0]
-  - name: "poly"
-    file: "models/poly.ply"
-    material: "poly_mat"
-    flags:
-      - DISABLE_RENDERING
     transforms:
       scale: 0.27
       rotate: [0.0, -10.0, 30.0]
@@ -73,7 +55,7 @@ objects:
 lights:
   - position: [0.6, 0.5, 1.0]
     color: [255,0,0]
-    intensity: 1.0
+    intensity: 0.0
   - position: [-0.6, 1.0, -1.0]
     color: [255,255,255]
     intensity: 0.6 

@@ -29,11 +29,10 @@
 #define MAX_REFLECTIONS 8u
 #define MAX_REFRACTIONS 8u
 #define BLENDER true
-#define DISABLE_RENDERING 0x01u
-#define DISABLE_SHADING 0x02u
-#define DISABLE_TEXTURES 0x04u
-#define DISABLE_BUMP 0x8u
-#define ENABLE_BACKFACE_CULLING 0x10u
+constexpr uint8_t DISABLE_RENDERING = 0x01u;
+constexpr uint8_t DISABLE_TEXTURES = 0x02u;
+constexpr uint8_t DISABLE_SHADING = 0x04u;
+constexpr uint8_t DISABLE_BUMP = 0x08u;
 
 // Math defs
 #define PI 3.14159265f
@@ -41,6 +40,7 @@
 #define EPSILON 1e-6f
 
 // Incomplete classes 
+class V3f;
 class Fragment;
 class RGBA;
 class Camera;
@@ -73,10 +73,12 @@ public:
     bool render(uint threads);
     void save(const char* path);
     RGBA compute_pixel(uint x, uint y);
-    bool intersection_shader(Ray&, Hit&, bool = false);
+    bool intersection_shader(Ray&, Hit&, uint32_t DISCARD = 0u);
     Fragment fragment_shader(Hit&);
     Fragment texture_shader(Hit& hit);
+    V3f bump_shader(Hit& hit);
     Fragment reflection_shader(Ray&, Hit&, uint);
+    Fragment refraction_shader(Ray&, Hit&, uint);
 };
 
 #endif

@@ -51,6 +51,8 @@ public:
     V3f operator+ (V3f a) { return V3f(x+a.x, y+a.y, z+a.z); }
     V3f operator- (V3f a) { return V3f(x-a.x, y-a.y, z-a.z); }
     V3f operator* (V3f a) { return V3f(x*a.x, y*a.y, z*a.z); }
+    V3f operator+ (float f) { return V3f(x+f, y+f, z+f); }
+    V3f operator- (float f) { return V3f(x-f, y-f, z-f); }
     V3f operator* (float f) { return V3f(x*f, y*f, z*f); }
     float length() { return sqrtf(x*x + y*y + z*z); }
     V3f normalize() { float m = length(); return V3f(x/m, y/m, z/m); }
@@ -93,9 +95,10 @@ public:
 class Fragment{
 public:
     float r,g,b,a;
-    Fragment() : r(0.0f), g(0.0f), b(0.0f), a(1.0f) {}
+    Fragment() : r(0.0f), g(0.0f), b(0.0f), a(0.0f) {}
     Fragment(float r, float g, float b, float a) : r(r), g(g), b(b), a(a) {}
-    Fragment(V3f vector) : r(vector.x), g(vector.y), b(vector.z), a(1.0f) {}
+    Fragment(V3f vector, float a) : r(vector.x), g(vector.y), b(vector.z), a(a) {}
+    Fragment(RGBA color) : r(static_cast<float>(color.r)/255.0f), g(static_cast<float>(color.g)/255.0f), b(static_cast<float>(color.b)/255.0f), a(static_cast<float>(color.a)/255.0f) {}
     void clamp255(){ 
         r = r>1.0f ? 1.0f : (r<0.0f ? 0.0f : r); g = g>1.0f ? 1.0f : (g<0.0f ? 0.0f : g); 
         b = b>1.0f ? 1.0f : (b<0.0f ? 0.0f : b); a = a>1.0f ? 1.0f : (a<0.0f ? 0.0f : a); 
@@ -244,35 +247,42 @@ public:
 };
 
 /* Light class */
+enum class LightType { ambient, point, directional };
 class Light{
 public:
-    V3f pos;
+    V3f pos, dir;
     RGBA color;
     float intensity;
-    Light(): pos(), color(), intensity(0.0f) {}
-    Light(V3f pos, RGBA color, float intensity) : pos(pos), color(color), intensity(intensity) {}
+    LightType type;
+    Light() {}
+    Light(V3f pos, RGBA color, float intensity) : pos(pos), color(color), intensity(intensity), type(LightType::point) {}
+    Light(RGBA color, float intensity) : color(color), intensity(intensity), type(LightType::ambient) {}
+    Light(RGBA color, float intensity, V3f dir) : dir(dir), color(color), intensity(intensity), type(LightType::directional) {}
+    static Light newAmbientLight(RGBA color, float intensity){ Light l; l.color = color; l.intensity = intensity; l.type = LightType::ambient; return l; }
+    static Light newPointLight(V3f pos, RGBA color, float intensity){ Light l; l.pos = pos; l.color = color; l.intensity = intensity; l.type = LightType::point; return l; }
+    static Light newDirLight(V3f dir, RGBA color, float intensity){ Light l; l.dir = dir; l.color = color; l.intensity = intensity; l.type = LightType::directional; return l; }
 };
 
 /* Vertex class: V3f + texture coordinates */
 class Vertex {
 public:
-    V3f vector;
+    V3f vector, normal;
     float u, v;
-    Vertex() : vector(), u(0.0f), v(0.0f) {}
-    Vertex(float x, float y, float z, float u, float v) : vector(x, y, z), u(u), v(v) {}
+    Vertex() : vector(), normal(), u(0.0f), v(0.0f) {}
+    Vertex(V3f vector, V3f normal, float u, float v) : vector(vector), normal(normal), u(u), v(v) {}
     void move(V3f m){ vector = vector + m; }
-    void scale(float s){ vector = vector * s; }
+    void scale(float s){ vector = vector * s; normal = normal * s; }
     void scale(V3f s){ vector = V3f(s.x * vector.x, s.y * vector.y, s.z * vector.z); }
-    void rotateX(float r){ vector.rotateX(r); }
-    void rotateY(float r){ vector.rotateY(r); }
-    void rotateZ(float r){ vector.rotateZ(r); }
+    void rotateX(float r){ vector.rotateX(r); normal.rotateX(r); }
+    void rotateY(float r){ vector.rotateY(r); normal.rotateY(r); }
+    void rotateZ(float r){ vector.rotateZ(r); normal.rotateZ(r); }
     void rotate(V3f r){ rotateZ(r.z); rotateY(r.y); rotateX(r.x); }
     string toString(){
         return "{" + vector.toString() + ", " + to_string(u) + ", " + to_string(v) + "}";
     }
 };
 
-/* Hit record: hit info */
+/* Hit struct: hit info */
 class Hit{
 public:
     Vertex point;
@@ -280,7 +290,6 @@ public:
     Ray ray;
     uint triId;
     Hit(){}
-    //Hit(Vertex point, V3f normal, uint triId) : point(point), normal(normal), triId(triId) {}
 };
 
 /* Material class */
@@ -288,9 +297,9 @@ class Material{
 public:
     RGBA* texture, * bump;
     RGBA color;
-    float diff, spec, reflective;
-    Material() : texture(NULL), bump(NULL), diff(0.0f), spec(0.0f), reflective(0.0f) {}
-    Material(float diff, float spec, float reflective) : texture(NULL), bump(NULL), diff(diff), spec(spec), reflective(reflective) {}
+    float diff, spec, reflective, refractive;
+    Material() : texture(NULL), bump(NULL), diff(0.0f), spec(0.0f), reflective(0.0f), refractive(0.0f) {}
+    Material(float diff, float spec, float reflective, float refractive) : texture(NULL), bump(NULL), diff(diff), spec(spec), reflective(reflective), refractive(refractive) {}
     void loadTexture(const char* path){ texture = loadPNG(path); }  // Load png as texture
     void loadBump(const char* path){ bump = loadPNG(path); }    // Load png as normal map
 };
@@ -299,13 +308,12 @@ public:
 class Tri {
 public:
     Vertex a, b, c;
-    uint matId;         // Material index for this Tri
+    uint16_t matId;     // Material and object index for this Tri
     V3f centroid;       // Tri centroid, for BVH traversal
     uint8_t flags;      // Rendering flags
 
-    Tri() : a(), b(), c(), matId(0u), centroid() {}
-    Tri(Vertex a, Vertex b, Vertex c) : a(a), b(b), c(c), matId(0u), centroid((a.vector+b.vector+c.vector)*0.33333f) {}
-    bool intersect(Ray ray, Hit& hit){
+    Tri(Vertex a, Vertex b, Vertex c, uint16_t matId, uint8_t flags) : a(a), b(b), c(c), matId(matId), flags(flags), centroid((a.vector+b.vector+c.vector)*0.33333f) {}
+    bool intersect(Ray ray, Hit& hit, bool interpolateNormal = true){
         V3f edge1 = b.vector - a.vector, edge2 = c.vector - a.vector, h = cross(ray.dir, edge2);
 
         float A = dot(edge1, h);
@@ -324,7 +332,12 @@ public:
             hit.point.vector = ray.point(t);
             hit.point.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
             hit.point.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
-            hit.normal = cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
+
+            hit.normal = interpolateNormal ? (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize() : cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
+            
+            //hit.normal = (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize();
+
+            //hit.normal = cross(a.vector - ray.point(t), b.vector - ray.point(t)).normalize();
             hit.ray = ray;
             return true;
         } else return false;
@@ -345,56 +358,55 @@ public:
     Poly() {}
     Poly(const char* path, uint matId, uint8_t flags = 0u){
         if(flags & DISABLE_RENDERING) return;
-
-        char line[64], element[32];
-        float x, y, z, u, v;
+        char buff[128u];
+        float x, y, z, nx, ny, nz, u, v;
         Vertex a, b, c;
-        int nvertex, nfaces;
+        uint nvertex, nfaces;
 
         ifstream input; input.open(path, fstream::in);
         if(!input.is_open()){ polymsg("\e[1;91m  err opening '" + string(path) + "'\e[0m\n"); exit(EXIT_FAILURE); }
 
-        // Read vertex and face number
-        for(int i=0; i<12; i++){
-            input.getline(line, 64);
-            stringstream iss(line);
-            if(i==3){ iss >> element; iss >> element; iss >> element; nvertex = stoi(element); }
-            if(i==9){ iss >> element; iss >> element; iss >> element; nfaces = stoi(element); }
+        // From the header we expect to get the number of faces and vertices, and also check if the vertex data contains the UVs and the normals
+        string element;
+        uint aux = 0;
+        while(element!="end_header" && input.getline(buff, 128u)){
+            stringstream iss(buff); iss >> element;
+            if(element=="property") aux++;
+            else if(element=="element"){
+                iss >> element;
+                if(element=="vertex"){ iss>>element; nvertex = stoi(element); }
+                else { iss>>element; nfaces = stoi(element); }
+            }
+        }
+        if(aux<8){ polymsg("\e[1;91m  err parsing '" + string(path) + "': property missing!\e[0m\n"); exit(EXIT_FAILURE); }
+
+        // Next we get nvertex lines with the vertex data, followed by nfaces lines with the tri data
+        vector<Vertex> vertices;
+        for(uint i=0; i<nvertex+nfaces; i++){
+            input.getline(buff, 128u);
+            istringstream iss(buff);
+            if(i<nvertex){  // Read vertex data: coordinates, normals and UVs, in that order
+                iss >> element; x = stof(element); iss >> element; y = stof(element); iss >> element; z = stof(element);
+                iss >> element; nx = stof(element); iss >> element; ny = stof(element); iss >> element; nz = stof(element);
+                iss >> element; u = stof(element); iss >> element; v = stof(element);
+
+                Vertex vertex = BLENDER ? Vertex(V3f(x,z,y), V3f(nx,nz,ny), u, 1.0f-v) : Vertex(V3f(x,y,z), V3f(nx,ny,nz), u, v);
+                vertices.push_back(vertex);
+
+            } else {        // Read tri data. Check if the line starts whith a 3
+                iss >> element;
+                if(element!="3") { polymsg("\e[1;91m  err parsing '" + string(path) + "': expected tri faces!\e[0m\n"); exit(EXIT_FAILURE); }
+                iss >> element; a = vertices[stoi(element)];
+                iss >> element; b = vertices[stoi(element)];
+                iss >> element; c = vertices[stoi(element)];
+
+                Tri tri = BLENDER ? Tri(a, c, b, matId, flags) : Tri(a, b, c, matId, flags);
+                tris.push_back(tri);
+            }
         }
 
-        // Read vertex data and store in temporal array
-        Vertex* vertices = (Vertex*) malloc(sizeof(Vertex) * nvertex);
-        for(uint i=0; i<nvertex; i++){
-            input.getline(line, 64);
-            stringstream iss(line);
-            iss >> element; x = stof(element);
-            iss >> element; y = stof(element);
-            iss >> element; z = stof(element);
-            iss >> element; u = stof(element);
-            iss >> element; v = stof(element);
-            
-            vertices[i] = BLENDER ? Vertex(x, z, y, u, 1.0f-v) : Vertex(x, y, z, u, v);
-        }
-
-        // Create tris
-        tris = vector<Tri>();
-        for(uint i=0; i<nfaces; i++){
-            input.getline(line, 64);
-            stringstream iss(line); iss >> element;
-            iss >> element; a = vertices[stoi(element)];
-            iss >> element; b = vertices[stoi(element)];
-            iss >> element; c = vertices[stoi(element)];
-
-            // iss >> element; flags = individual tri rendering flags
-            // iss >> element; matId = individual tri material
-
-            Tri t = BLENDER ? Tri(a, c, b) : Tri(a, b, c); t.flags = flags; t.matId = matId;
-            tris.push_back(t);
-        }
-        free(vertices);
         input.close();
         if(input.is_open()){ polymsg("\e[1;91m  err closing '" + string(path) + "'\e[0m\n"); exit(EXIT_FAILURE); }
-
         polymsg("\e[1;93m  loaded " + to_string(tris.size()) + " tris from '" + string(path) + "'\e[0m\n");
     }
     void move(V3f m){
@@ -471,8 +483,6 @@ uint8_t parseFlag(YAML::Node node){
         return DISABLE_TEXTURES;
     if(flag=="DISABLE_BUMP")
         return DISABLE_BUMP;
-    if(flag=="ENABLE_BACKFACE_CULLING")
-        return ENABLE_BACKFACE_CULLING;
     polymsg("\e[1;96m  err unknown rendering flag '" + string(flag) + "'\e[0m\n"); return 0u;
 }
 
@@ -502,15 +512,18 @@ bool PolyRenderer::loadScene(const char* path){
         // Parse materials and store material name for object declaration
         if(file["materials"]){
             YAML::Node mats = file["materials"];
+            this->mats.push_back(Material()); // Dummy material
+            mats_names.push_back("");
             for(const auto& m : mats){
                 if(m["name"] && m["diffuse"] && m["specular"]){
                     string mat_name = m["name"].as<string>();
-                    float diff = m["diffuse"].as<float>(), spec = m["specular"].as<float>(), reflect = m["reflective"] ? m["reflective"].as<float>() : 0.0f;
-                    Material mat = Material(diff, spec, reflect);
+                    float diff = m["diffuse"].as<float>(), spec = m["specular"].as<float>();
+                    float reflect = m["reflective"] ? m["reflective"].as<float>() : 0.0f, refract = m["refractive"] ? m["refractive"].as<float>() : 0.0f;
+                    Material mat = Material(diff, spec, reflect, refract);
                     if(m["texture"]) mat.loadTexture((script_path + m["texture"].as<string>()).c_str()); 
                     else if(m["color"]) mat.color = parseColor(m["color"]);
                     else { polymsg("\e[1;91m  err parsing material: texture or color missing!\e[0m\n"); return false; }
-                    if(m["normal"]) mat.loadBump((script_path + m["normal"].as<string>()).c_str());
+                    if(m["bump"]) mat.loadBump((script_path + m["bump"].as<string>()).c_str());
 
                     // Push material and name at same index
                     this->mats.push_back(mat);
@@ -520,6 +533,7 @@ bool PolyRenderer::loadScene(const char* path){
         } else { polymsg("\e[1;91m  err parsing scene: materials missing\e[0m\n"); return false; }
 
         // Parse objects and store object name
+        uint32_t polyi = 0u;
         if(file["objects"]){
             YAML::Node objs = file["objects"];
             for(const auto& obj : objs){
@@ -539,7 +553,7 @@ bool PolyRenderer::loadScene(const char* path){
                         for(auto f : flags)
                             obj_flags |= parseFlag(f);
 
-                    Poly poly = Poly(obj_file.c_str(), distance(mats_names.begin(), it), obj_flags);
+                    Poly poly = Poly(obj_file.c_str(), static_cast<uint16_t>(distance(mats_names.begin(), it)), obj_flags);
                     if(obj["transforms"])
                         for(const auto& t : obj["transforms"]){
                             string op = t.first.as<string>();
@@ -568,8 +582,17 @@ bool PolyRenderer::loadScene(const char* path){
         if(file["lights"]){
             YAML::Node ls = file["lights"];
             for(const auto& l : ls){
-                if(l["position"] && l["color"] && l["intensity"]){
-                    lights.push_back(Light(parseV3f(l["position"]), parseColor(l["color"]), l["intensity"].as<float>()));
+                if(l["type"] && l["color"] && l["intensity"]){
+                    string ltype = l["type"].as<string>();
+                    if(ltype=="ambient"){
+                        lights.push_back(Light::newAmbientLight(parseColor(l["color"]), l["intensity"].as<float>()));
+                    } else if(ltype=="point"){
+                        if(!l["position"]){ polymsg("\e[1;91m  err parsing point light: position missing!\e[0m\n"); return false; }
+                        lights.push_back(Light::newPointLight(parseV3f(l["position"]), parseColor(l["color"]), l["intensity"].as<float>()));
+                    } else if(ltype=="directional"){
+                        if(!l["direction"]){ polymsg("\e[1;91m  err parsing directional light: direction missing!\e[0m\n"); return false; }
+                        lights.push_back(Light::newDirLight(parseV3f(l["direction"]), parseColor(l["color"]), l["intensity"].as<float>()));
+                    } else { polymsg("\e[1;91m  err parsing light: unknown light type!\e[0m\n"); return false; }
                 } else { polymsg("\e[1;91m  err parsing light: attributes missing!\e[0m\n"); return false; }
             }
         } else { polymsg("\e[1;91m  err parsing scene: lights missing!\e[0m\n"); return false; }
@@ -587,10 +610,26 @@ bool PolyRenderer::loadScene(const char* path){
 /* Texture shader: return texture element from u,v coordinates */
 Fragment PolyRenderer::texture_shader(Hit& hit){
     uint matId = tris[hit.triId].matId;
-    uint16_t tx = hit.point.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
-    uint16_t ty = hit.point.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
-    // return mats[matId].texture[tx + ty*TEXTURE_SIZE];
-    return Fragment(mats[matId].texture[tx + ty*TEXTURE_SIZE].asV3f());
+    RGBA color;
+    if(mats[matId].texture){
+        uint16_t tx = hit.point.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
+        uint16_t ty = hit.point.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
+        color = mats[matId].texture[tx + ty*TEXTURE_SIZE];
+    } else color = mats[matId].color;
+    return Fragment(color);
+}
+
+/* Bump shader: update hit.normal using bump map */
+V3f PolyRenderer::bump_shader(Hit& hit){
+    uint matId = tris[hit.triId].matId;
+    V3f normal = hit.normal;
+    if(mats[matId].bump){
+        uint16_t tx = hit.point.u * (TEXTURE_SIZE-1); tx %= (TEXTURE_SIZE-1);
+        uint16_t ty = hit.point.v * (TEXTURE_SIZE-1); ty %= (TEXTURE_SIZE-1);
+        normal =  mats[matId].bump[tx + ty*TEXTURE_SIZE].asV3f() * 2.0f - 1.0f;
+    }
+
+    return normal;
 }
 
 /* Reflection shader: compute n reflection */
@@ -605,6 +644,19 @@ Fragment PolyRenderer::reflection_shader(Ray& ray, Hit& hit, uint n){
     } else return fragment;
 }
 
+/* Refraction shader: compute n refraction */
+Fragment PolyRenderer::refraction_shader(Ray& ray, Hit& hit, uint n){
+    /*Material mat = mats[tris[hit.triId].matId];
+    Fragment fragment = fragment_shader(hit);
+    if(n<MAX_REFRACTIONS && (mat.refractive>0.0f || fragment.a<1.0f)){
+        Ray rray = Ray(hit.point.vector, ray.dir);
+        Hit rhit;
+        // if (fragment.a<1.0f) return intersection_shader(rray, rhit) ? refraction_shader(ray, rhit, n+1) : fragment; 
+        return intersection_shader(rray, rhit) ? fragment * (1.0f-mat.refractive) + refraction_shader(ray, rhit, n+1) * mat.refractive : fragment;
+    } else return fragment;*/
+    return Fragment();
+}
+
 /* Fragment shader: main shading program */
 Fragment PolyRenderer::fragment_shader(Hit& hit){
     Fragment out;
@@ -613,57 +665,79 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
     // Texture mapping step
     Fragment texture;
     if(!(tri.flags & DISABLE_TEXTURES) && tri.matId<mats.size()){
-        texture = mats[tri.matId].texture ? texture_shader(hit) : Fragment(mats[tri.matId].color.asV3f());
-    } else texture = Fragment(1.0f, 0.0f, 1.0f, 1.0f);
+        texture = texture_shader(hit);
+    } else texture = Fragment(1.0f, 1.0f, 1.0f, 1.0f);
 
     // TODO: bump mapping step
-    if(!(tri.flags & DISABLE_BUMP)){
-        // hit.normal = bump mapping using material nomal map
+    if(!(tri.flags & DISABLE_BUMP) && tri.matId<mats.size()) hit.normal = bump_shader(hit);
+
+    // Perform transparency blending
+    if(texture.a<1.0f){
+        Ray rray = Ray(hit.point.vector, hit.ray.dir);
+        Hit rhit;
+        if(intersection_shader(rray, rhit)) return texture * texture.a + fragment_shader(rhit);
     }
 
     // Blinn-Phong shading step
-    Fragment blinn_phong;
+    V3f blinn_phong, ambient;
     if(!(tri.flags & DISABLE_SHADING)){
-        V3f view = (hit.ray.ori - hit.point.vector).normalize();
+        V3f view = (cam->ori - hit.point.vector).normalize();
         for(auto& l : lights){
             if(l.intensity==0.0f) continue;
 
             Material mat = *(&mats[tri.matId]); 
-            V3f ldir = (l.pos - hit.point.vector).normalize(), half = (ldir + view).normalize();
+            V3f ldir, half;
+            float att;
+
+            // Compute shading depending of light source type
+            if(l.type==LightType::directional) { ldir = l.dir.normalize(); att = 1.0f; }
+            else if(l.type==LightType::point) { 
+                ldir = (l.pos-hit.point.vector).normalize(); 
+                float dist = (l.pos-hit.point.vector).length();
+                att = 1.0f / (1.0f + 0.14f * dist + 0.07 * (dist * dist));
+            }
+            else if(l.type==LightType::ambient) { ambient = ambient + (l.color.asV3f() * l.intensity); continue;  }
 
             // Check if there's geometry between the fragment and the light
-            V3f sori = dot(ldir, hit.normal) < 0.0f ? hit.point.vector - hit.normal * EPSILON : hit.point.vector + hit.normal * EPSILON;
+            V3f sori = dot(ldir, hit.normal) < 0.0f ? hit.point.vector - hit.normal * 1e-3f : hit.point.vector + hit.normal * 1e-3f;
             Ray lray = Ray(sori, ldir);
             Hit hit2;
-            if(intersection_shader(lray, hit2, true)) continue;
-
+            if(intersection_shader(lray, hit2, (DISABLE_SHADING<<16u))) continue;
             
             // Compute diffuse and specular components of the fragment
+            half = (ldir + view).normalize();
             float diff = max(0.0f, dot(hit.normal, ldir));
             V3f diffuse = (l.color.asV3f() * l.intensity) * (diff * mat.diff);
 
             float spec = powf(max(0.0f, dot(hit.normal, half)), mat.spec);
             V3f specular = (l.color.asV3f() * l.intensity) * (spec * mat.spec);
 
-            blinn_phong = blinn_phong + diffuse + specular;
+            blinn_phong = blinn_phong + diffuse*att + specular*att;
         }
 
     } else blinn_phong = V3f(1.0f, 1.0f, 1.0f);
 
     // Compute final fragment color
-    out = blinn_phong * texture;
+    out = Fragment(blinn_phong + ambient) * texture;
 
     return out;
 }
 
 /* Intersection shader: compute closest Tri hit */
-bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, bool NO_SHADING){
+bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint32_t DISCARD){
     bool intersection = false;
     float z = 1000.0f;
     Hit aux;
     for(uint i=0; i<tris.size(); i++){
         Tri tri = tris[i];
-        if(NO_SHADING && tri.flags & DISABLE_SHADING) continue;
+        /* DISCARD is a 4 byte flag that filters which tris should be discarted:
+            - Lower 2 bytes: by material id
+            - Upper first byte: unused
+            - Upper second byte: by rendering flag
+        */
+        if(tri.matId == (uint16_t)(DISCARD & 0xffffu)) continue;
+        if(tri.flags & ((DISCARD>>16u) & 0xff)) continue;
+
         if(tri.intersect(ray, aux) && aux.point.vector.z<z){
             hit = aux;
             z = hit.point.vector.z;
@@ -689,24 +763,18 @@ RGBA PolyRenderer::compute_pixel(uint x, uint y){
         // Fragment shading step: compute fragment base color
         Fragment fragment = fragment_shader(hit);
 
-        // Reflection step: compute reflected color
-        if(!(tri.flags & DISABLE_SHADING) && mat.reflective>0.0f) fragment = reflection_shader(ray, hit, 0);
+        //return (Fragment(hit.normal, 1.0f)).toRGBA();
 
-        // Transparency step: if first intersection is translucent, start loop
-        /*if(fragment.a!=255){
-            out = fragment * (static_cast<float>(fragment.a) / 255.0f);
-            while(fragment.a!=255 && refractionRays<MAX_REFRACTIONS) {
-                Ray ray2 = Ray(hit.point.vector, ray.dir);
-                if(intersection_shader(ray2, hit)){
-                    fragment = fragment_shader(hit);
-                } else refractionRays = MAX_REFRACTIONS;
-                out = out + fragment*(static_cast<float>(fragment.a)/255.0f);
-                refractionRays++;
-            }
-        } else out = fragment;*/
+        // Reflection step: compute reflected color
+        Fragment reflection;
+        if(!(tri.flags & DISABLE_SHADING) && mat.reflective>0.0f) reflection = reflection_shader(ray, hit, 0);
+
+        // Refraction step
+        Fragment refraction;
+        //if(!(tri.flags & DISABLE_SHADING) && (mat.refractive>0.0f || fragment.a<1.0f)) refraction = refraction_shader(ray, hit, 0);
 
         // Final pixel color
-        out = fragment.toRGBA();
+        out = (fragment + reflection + refraction).toRGBA();
     }
     
     // Return final pixel color
