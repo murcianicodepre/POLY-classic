@@ -1,28 +1,34 @@
-# demo.poly ~ demo scene for poly-classic
-# Diego Párraga Nicolás ~ diegojose.parragan@um.es
+# demo.poly
+debug:
+  - DRAW_AABB
 
 camera:
-  position: [0.0, 0.1, -0.5]
-  fov: 50.0
+  position: [0.0, 1.0, 0.0]
+  fov: 90.0
 
 materials:
   - name: "sky_mat"
-    diffuse: 2.0
-    specular: 32.0
     texture: "textures/sky2.png"
-  - name: "pc_mat"
+    diffuse: 0.0
+    specular: 0.0
+  - name: "cube_mat"
+    texture: "textures/demo_texture.png"
     diffuse: 2.0
-    specular: 32.0
-    texture: "textures/ibm5110.png"
+    specular: 16.0
   - name: "floor_mat"
-    diffuse: 2.0
-    specular: 32.0
     texture: "textures/water.png"
-    reflective: 0.5
-  - name: "poly_mat"
     diffuse: 2.0
     specular: 32.0
-    texture: "textures/poly_texture.png"
+    reflective: 0.5
+  - name: "cone_mat"
+    color: [255,255,0]
+    diffuse: 2.0
+    specular: 32.0
+  - name: "mirror_mat"
+    color: [255,0,255]
+    diffuse: 2.0
+    specular: 32.0
+    reflective: 0.8
 
 objects:
   - name: "sky"
@@ -30,33 +36,52 @@ objects:
     material: "sky_mat"
     flags:
       - DISABLE_SHADING
+      - DISABLE_RENDERING
     transforms:
-      scale: 3.0
-      move: [0.0, 0.0, 2.2]
-  - name: "pc"
-    file: "models/ibm5110.ply"
-    material: "pc_mat"
+      scale: 5.0
+      move: [0.0, 0.0, 3.0]
+  - name: "cube"
+    file: "models/cube.ply"
+    material: "cube_mat"
     transforms:
-      scale: 0.3
-      rotate: [0.0, 20.0, 0.0]
-      move: [0.2, -0.2, 1.1]
+      scale: 0.2
+      rotate: [-20.0, 45.0, 0.0]
+      move: [0.0, 0.06, 1.5]
   - name: "floor"
     file: "models/quad.ply"
     material: "floor_mat"
+    flags:
     transforms:
-      scale: 5.0
+      scale: 6.0
       rotate: [90.0, 0.0, 0.0]
-      move: [0.0, -0.2, 2.0]
+      move: [0.0, -0.3, 3.0]
+
+  - name: "cone"
+    file: "models/cone.ply"
+    material: "cone_mat"
+    flags:
     transforms:
-      scale: 0.27
-      rotate: [0.0, -10.0, 30.0]
-      move: [-0.18, 0.084 , 1.8]
+      scale: 0.3
+      rotate: [0.0, 0.0, 20.0]
+      move: [-0.6, 0.06, 1.7]
+
+  - name: "minicube"
+    file: "models/cube.ply"
+    material: "mirror_mat"
+    transforms:
+      scale: 0.1
+      rotate: [-20.0, 45.0, 30.0]
+      move: [0.34, 0.06, 1.1]
 
 lights:
-  - position: [0.6, 0.5, 1.0]
-    color: [255,0,0]
-    intensity: 0.0
-  - position: [-0.6, 1.0, -1.0]
+  - type: "point"
+    position: [-0.5, 1.0, 0.0]
     color: [255,255,255]
-    intensity: 0.6 
-
+    intensity: 1.0
+  - type: "point"
+    position: [0.34, 0.06, 0.5]
+    color: [255,0,0]
+    intensity: 0.5
+  - type: "ambient"
+    color: [100,100,100]
+    intensity: 0.3

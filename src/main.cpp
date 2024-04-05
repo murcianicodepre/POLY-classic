@@ -5,8 +5,7 @@
 
 #include <iostream>
 #include <cstdlib>
-#include "poly-classic.h"
-using namespace std;
+#include "PolyRenderer.h"
 
 /* Print usage */
 void printUsage(){
@@ -47,7 +46,7 @@ int main(int argc, char** argv){
     output += outputname;
 
     // Print intro
-    printIntro();
+    PolyRenderer::printIntro();
 
     // Create rendering struct and start render
     PolyRenderer renderer = PolyRenderer();

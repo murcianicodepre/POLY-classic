@@ -1,0 +1,38 @@
+# computer.poly
+
+camera:
+  position: [0.0, 0.0, 0.0]
+  fov: 60.0
+
+materials:
+  - name: "sky_mat"
+    diffuse: 0.0
+    specular: 0.0
+    texture: "textures/sky2.png"
+  - name: "computer_mat"
+    diffuse: 2.0
+    specular: 16.0
+    texture: "textures/pc-jo.png"
+
+objects:
+  - name: "sky"
+    file: "models/sky.ply"
+    material: "sky_mat"
+    flags:
+      - DISABLE_SHADING
+      - DISABLE_RENDERING
+    transforms:
+      scale: 5.0
+      move: [0.0, 0.0, 2.5]
+  
+  - name: "computer"
+    file: "models/quad.ply"
+    material: "computer_mat"
+    transforms:
+      move: [0.0, 0.0, 1.5]
+
+lights:
+  - type: directional
+    direction: [0.5, 1.0, -2.0]
+    color: [255,255,255]
+    intensity: 1.0
