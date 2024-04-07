@@ -40,12 +40,11 @@ public:
     void buildBVH();
     void updateNodeBounds(uint32_t nodeId);
     void subdivide(uint32_t nodeId);
-    void intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint8_t discard, bool& b);
+    void intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, bool& bvhIntersection, uint16_t flags = 0x0000u);
 
     // Rendering pipeline shaders
     RGBA compute_pixel(uint16_t x, uint16_t y);
-    bool intersection_shader(Ray& ray, Hit& hit, uint8_t discard = 0x00u);
-    bool fast_intersection_shader(Ray& ray, Hit& hit, uint8_t discard = 0x00u);
+    bool intersection_shader(Ray& ray, Hit& hit, uint16_t flags = 0x0000u);
     Fragment fragment_shader(Hit& hit);
     Fragment texture_shader(Hit& hit);
     Vec3 bump_shader(Hit& hit);
@@ -60,10 +59,10 @@ public:
     static void polyMsg(std::string msg);
     static Vec3 parseVec3(YAML::Node node);
     static RGBA parseColor(YAML::Node node);
-    static uint8_t parseFlag(YAML::Node node);
+    static uint16_t parseFlags(YAML::Node node);
 
     // Debug flags
-    uint8_t debug = 0x00u;
+    uint16_t debug;
 }; 
 
 

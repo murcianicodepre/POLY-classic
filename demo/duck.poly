@@ -1,10 +1,10 @@
 # duck demo
 debug:
-  - DRAW_AABB
+  - DISABLE_REFLECTIONS
+  - DISABLE_FAST_INTERSECTION_SHADER
 
 camera:
-  #position: [0.0, 0.15, 0.0]
-  position: [0.0, 1.0, 0.0]
+  position: [0.0, 0.15, 0.0]
   fov: 40.0
 
 materials: 
@@ -14,10 +14,12 @@ materials:
     specular: 0.0
   - name: "duck_mat"
     texture: "textures/duck.png"
+    bump: "textures/duck_normal.png"
     diffuse: 2.0
     specular: 32.0
   - name: "floor_mat"
     texture: "textures/water.png"
+    bump: "textures/water_bump.png"
     diffuse: 2.0
     specular: 32.0
     reflective: 0.3
@@ -28,13 +30,13 @@ objects:
     material: "sky_mat"
     flags:
       - DISABLE_SHADING
-      - DISABLE_RENDERING
     transforms:
       scale: 5.0
       move: [0.0, 0.0, 3.0]
   - name: "duck"
     file: "models/duck.ply"
     material: "duck_mat"
+    flags:
     transforms:
       rotate: [0.0, 30.0, 0.0]
       move: [0.0, -0.2, 2.0]
@@ -42,7 +44,6 @@ objects:
     file: "models/quad.ply"
     material: "floor_mat"
     flags:
-      #- DISABLE_RENDERING
     transforms:
       scale: 3.0
       rotate: [90.0, 0.0, 0.0]

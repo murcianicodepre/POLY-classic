@@ -42,7 +42,10 @@ void PolyRenderer::buildBVH(){
     root.n = tris.size(); root.first = 0; root.left = 0;
 
     updateNodeBounds(0);    // Update bounds of root node
-    subdivide(0);        // Start subdivision
+    subdivide(0);           // Start subdivision
+
+    // Print size of bvh structure
+    PolyRenderer::polyMsg("\e[1;93m compiling bvh: \e[95m" + to_string(nextNode) + " \e[93mnodes \e[92mOK\e[0m\n");
 }
 
 void PolyRenderer::updateNodeBounds(uint32_t nodeId){
@@ -93,18 +96,18 @@ void PolyRenderer::subdivide(uint32_t nodeId){
     subdivide(leftIdx); subdivide(rightIdx);
 }
 
-void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint8_t discard, bool& b){
+void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, bool& bvhIntersection, uint16_t flags){
     BVHNode& node = bvh[nodeId];
     if(!node.intersectAABB(ray)) return;
-    b = true;
+    bvhIntersection = true;
     if(node.n>0){
         float z = 1000.0f;
         Hit aux;
         for(uint32_t i=0; i<node.n; i++){
             Tri& tri = tris[triIdx[node.first+i]];
 
-            // Discard tri if matches with discard flag
-            if(tri.flags & discard) continue;
+            // Discard tri if matches with low byte of flags
+            if(tri.flags & static_cast<uint8_t>(flags & 0xffu)) continue;
 
             // Tri intersection test
             if(tri.intersect(ray, aux) && aux.point.z<z){
@@ -117,8 +120,8 @@ void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint8_t dis
         }
 
     } else {
-        intersectBVH(ray, hit, node.left, discard, b);
-        intersectBVH(ray, hit, node.left + 1, discard, b);
+        intersectBVH(ray, hit, node.left, bvhIntersection, flags);
+        intersectBVH(ray, hit, node.left + 1, bvhIntersection, flags);
     }
 }
 
@@ -145,24 +148,35 @@ RGBA PolyRenderer::parseColor(YAML::Node node){
         return RGBA(node[0].as<uint8_t>(), node[1].as<uint8_t>(), node[2].as<uint8_t>(), node[3] ? node[3].as<uint8_t>() : 255u);
     } else throw runtime_error("\e[1;91m  err parsing RGBA\e[0m\n");
 }
-uint8_t PolyRenderer::parseFlag(YAML::Node node){
-    string flag = node.as<string>();
-    if(flag=="DISABLE_RENDERING")
-        return DISABLE_RENDERING;
-    if(flag=="DISABLE_SHADING")
-        return DISABLE_SHADING;
-    if(flag=="DISABLE_TEXTURES")
-        return DISABLE_TEXTURES;
-    if(flag=="DISABLE_BUMP")
-        return DISABLE_BUMP;
-    if(flag=="DISABLE_TRANSPARENCY")
-        return DISABLE_TRANSPARENCY;
-    if(flag=="DISABLE_SHADOWS")
-        return DISABLE_SHADOWS;
-    if(flag=="DRAW_AABB")
-        return DRAW_AABB;
-    polyMsg("\e[1;96m  err unknown rendering flag '" + string(flag) + "'\e[0m\n");
-    return 0;
+
+uint16_t PolyRenderer::parseFlags(YAML::Node node){
+    uint16_t flags = 0x0000u;
+    for(auto f : node){
+        string flag = f.as<string>();
+        if(flag=="DISABLE_RENDERING")
+            flags |= DISABLE_RENDERING;
+        else if(flag=="DISABLE_SHADING")
+            flags |= DISABLE_SHADING;
+        else if(flag=="DISABLE_TEXTURES")
+            flags |= DISABLE_TEXTURES;
+        else if(flag=="DISABLE_BUMP")
+            flags |= DISABLE_BUMP;
+        else if(flag=="DISABLE_TRANSPARENCY")
+            flags |= DISABLE_TRANSPARENCY;
+        else if(flag=="DISABLE_SHADOWS")
+            flags |= DISABLE_SHADOWS;
+        else if(flag=="DISABLE_REFLECTIONS")
+            flags |= DISABLE_REFLECTIONS;
+        else if(flag=="DISABLE_REFRACTIONS")
+            flags |= DISABLE_REFRACTIONS;
+        else if(flag=="DRAW_AABB")
+            flags |= (DRAW_AABB<<8);
+        else if(flag=="DISABLE_FAST_INTERSECTION_SHADER")
+            flags |= (DISABLE_FAST_INTERSECTION_SHADER<<8);
+        else PolyRenderer::polyMsg("\e[1;96m  err unknown flag '" + string(flag) + "'\e[0m\n");
+        
+    }
+    return flags;
 }
 
 // Load scene data from .poly
@@ -179,12 +193,9 @@ bool PolyRenderer::loadScene(const char* path){
         vector<Poly> polys;
 
         // Parse debug flags
-        if(file["debug"]){
-            YAML::Node dflags = file["debug"];
-            for(auto f : dflags)
-                debug |= parseFlag(f);
-        }
-
+        if(file["debug"])
+            debug = (parseFlags(file["debug"]) & 0xffffu);
+        
         // Parse camera
         if(file["camera"]){
             YAML::Node camera = file["camera"];
@@ -216,7 +227,6 @@ bool PolyRenderer::loadScene(const char* path){
         } else { PolyRenderer::polyMsg("\e[1;91m  err parsing scene: materials missing\e[0m\n"); return false; }
 
         // Parse objects and store object name
-        uint32_t polyi = 0u;
         if(file["objects"]){
             YAML::Node objs = file["objects"];
             for(const auto& obj : objs){
@@ -231,12 +241,10 @@ bool PolyRenderer::loadScene(const char* path){
                     
                     // Parse rendering flags
                     uint8_t obj_flags = 0u;
-                    YAML::Node flags = obj["flags"];
-                    if(flags)
-                        for(auto f : flags)
-                            obj_flags |= parseFlag(f);
+                    if(obj["flags"])
+                        obj_flags = static_cast<uint8_t>(parseFlags(obj["flags"]));
 
-                    Poly poly = Poly(obj_file.c_str(), static_cast<uint16_t>(distance(mats_names.begin(), it)), obj_flags);
+                    Poly poly = Poly(obj_file.c_str(), static_cast<uint16_t>(distance(mats_names.begin(), it)), (obj_flags|(debug & 0xffu)));
                     if(obj["transforms"])
                         for(const auto& t : obj["transforms"]){
                             string op = t.first.as<string>();
@@ -249,8 +257,8 @@ bool PolyRenderer::loadScene(const char* path){
                                     poly.move(parseVec3(t.second));
                                 else PolyRenderer::polyMsg("\e[1;94m  unknown transform '" + op + "'\e[0m\n");
                         }
-                    
-                    // Insert object and object name in vector
+
+                    // Insert both object and object name in vector
                     polys.push_back(poly);
                     objs_names.push_back(obj_name);
 
@@ -292,6 +300,13 @@ bool PolyRenderer::loadScene(const char* path){
 
 // Render scene using N threads
 bool PolyRenderer::render(uint8_t threads){
+
+    // If global option DISABLE_RENDERING is set, return false directly
+    if((debug & 0xffu) & DISABLE_RENDERING){
+        printf("\e[1;91m fatal: rendering disabled!\e[0m\n");
+        return false;
+    }
+
     float tini, trender;
 
     // Open display and create X11 window to show rendering at real time
@@ -328,7 +343,8 @@ bool PolyRenderer::render(uint8_t threads){
     }
 
     // Build BVH acceleration struct after scene is loaded
-    buildBVH();
+    if(!((debug>>8) & DISABLE_FAST_INTERSECTION_SHADER))
+        buildBVH();
 
     // Start timer and launch rendering threads
     printf("\e[1;93m rendering in %s × %d\e[0m\n", PolyRenderer::getCpu(), threads);
@@ -387,10 +403,10 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
     Fragment frag;
 
     // Intersection step: compute closest tri intersection
-    if(fast_intersection_shader(ray, hit)){
+    if(intersection_shader(ray, hit)){
         
         // Debug: draw AABB
-        if(!hit.valid) return RGBA(0,255,255,255);
+        if(((debug>>8) & DRAW_AABB) && !hit.valid) return RGBA(0,255,255,255);
 
         Tri& tri = tris[hit.tri];
         Material& mat = mats[tri.mat];
@@ -399,10 +415,10 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
         frag = fragment_shader(hit);
 
         // Reflection step: compute N reflection
-        frag = (!(tri.flags & DISABLE_SHADING) && mat.reflective>1e-3f) ? reflection_shader(ray, hit, 0) : frag;
+        frag = (!(tri.flags & (DISABLE_SHADING | DISABLE_REFLECTIONS)) && mat.reflective>1e-3f) ? reflection_shader(ray, hit, 0) : frag;
 
         // TODO Refraction step: compute N refraction
-        frag = (!(tri.flags & DISABLE_SHADING) && mat.refractive>1e-3f) ? refraction_shader(ray, hit, 0) : frag;
+        frag = (!(tri.flags & (DISABLE_SHADING | DISABLE_REFRACTIONS )) && mat.refractive>1e-3f) ? refraction_shader(ray, hit, 0) : frag;
 
         // Compute final pixel color
         out = RGBA(frag);
@@ -413,31 +429,28 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
 }
 
 // Intersection shader: compute closest tri hit
-bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint8_t discard){
-    bool result = false;
-    float z = 1000.0f;
-    Hit aux = {};
-    uint32_t triId = 0;
+bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint16_t flags){
 
-    for(Tri& tri : tris){
-        // Discard if tri.flags matches with discard byte
-        if(tri.flags & discard) continue;
+    if ((debug>>8) & DISABLE_FAST_INTERSECTION_SHADER){
+        float z = 1000.0f;
+        Hit aux;
+        for(uint32_t i=0; i<tris.size(); i++){
+            Tri& tri = tris[i];
 
-        // Compute intersection point
-        if(tri.intersect(ray, aux) && aux.point.z<z){   // Store new closest hit
-            hit = aux; z = hit.point.z; hit.tri = triId; result = true;
+            // Discard if tri.flags matches with low byte of flags
+            if(tri.flags & static_cast<uint8_t>(flags & 0xffu)) continue;
+
+            // Intersection test
+            if(tri.intersect(ray, aux) && aux.point.z<z){
+                hit = aux; z = hit.point.z; hit.tri = i; hit.valid = true; hit.ray = ray;
+            }
         }
-        triId++;
+        return hit.valid;
+    } else {
+        bool bvhIntersection = false;
+        intersectBVH(ray, hit, 0, bvhIntersection, flags);
+        return ((flags>>8) & DRAW_AABB) ? bvhIntersection : hit.valid;
     }
-
-    return result;
-}
-
-// Fast intersection shader: compute closest tri hit using acceleration struct
-bool PolyRenderer::fast_intersection_shader(Ray& ray, Hit& hit, uint8_t discard){
-    bool b = false;
-    intersectBVH(ray, hit, 0, discard, b);
-    return (debug & DRAW_AABB) ? b : hit.valid;
 }
 
 // Fragment shader: main fragment shader program
@@ -447,21 +460,22 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
     Material& mat = mats[tri.mat];
 
     // Texture mapping step
-    Fragment tex = (!(tri.flags & DISABLE_TEXTURES) && tri.mat<mats.size()) ? texture_shader(hit) : Fragment(1.0f,0.0f,1.0f,1.0f);
+    Fragment tex = (!((tri.flags | (debug & 0xffu)) & DISABLE_TEXTURES) && tri.mat<mats.size()) ? texture_shader(hit) : Fragment(1.0f,0.0f,1.0f,1.0f);
 
-    // TODO Bump mapping step
-    Vec3 bump = bump_shader(hit);
+    // Bump mapping step
+    Vec3 bump = (!((tri.flags | (debug & 0xffu)) & DISABLE_BUMP) && tri.mat<mats.size()) ? bump_shader(hit) : Vec3(1.0f,1.0f,1.0f);
+    hit.phong = hit.phong * bump;
 
     // Transparency blending
-    if(!(tri.flags & DISABLE_TRANSPARENCY) && tex.a<1.0f){
+    if(!((tri.flags | (debug & 0xffu)) & DISABLE_TRANSPARENCY) && tex.a<1.0f){
         Ray rray = Ray(hit.point, hit.ray.dir);
         Hit rhit;
-        if(fast_intersection_shader(rray, rhit)) return (tex * tex.a) + fragment_shader(rhit);
+        if(intersection_shader(rray, rhit)) return (tex * tex.a) + fragment_shader(rhit);
     }
 
     // Blinn-Phong shading step
     Vec3 blinn_phong;
-    if(!(tri.flags & DISABLE_SHADING)){
+    if(!((tri.flags | (debug & 0xffu)) & DISABLE_SHADING)){
         Vec3 view = (cam->ori - hit.point).normalize();
 
         for(auto& l : lights){
@@ -482,12 +496,12 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
             } else { blinn_phong = blinn_phong + l.get()->color.toVec3() * l.get()->intensity; continue; }
 
             // Check if there's geometry between the fragment and the light source
-            /*if(!(tri.flags & DISABLE_SHADOWS)){
+            if(!((tri.flags | (debug & 0xffu)) & DISABLE_SHADOWS)){
                 Vec3 sori = Vec3::dot(ldir, hit.normal) < 0.0f ? hit.point - hit.normal*EPSILON : hit.point + hit.normal*EPSILON;
                 Ray lray = Ray(sori, ldir);
                 Hit hit2;
-                if(fast_intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING)) continue;
-            }*/
+                if(intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING)) continue;
+            }
 
             // Compute fragment's specular and diffuse components
             float diff = max(0.0f, Vec3::dot(hit.phong, ldir));
@@ -521,8 +535,10 @@ Fragment PolyRenderer::texture_shader(Hit& hit){
 Vec3 PolyRenderer::bump_shader(Hit& hit){
     Material& mat = mats[tris[hit.tri].mat];
     if(mat.bump){
-        // TODO
-        return Vec3();
+        // TODO: convert to tangent coordinates and compute normal vector using bump texture
+        uint16_t tx = hit.u * (TEXTURE_SIZE - 1); tx %= (TEXTURE_SIZE-1);
+        uint16_t ty = hit.v * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
+        return mat.bump[tx + ty*TEXTURE_SIZE].toVec3() * 2.0f - 1.0f;
     } else return Vec3(1.0f,1.0f,1.0f);
 }
 
@@ -534,7 +550,7 @@ Fragment PolyRenderer::reflection_shader(Ray& ray, Hit& hit, uint8_t N_REFLECTIO
         Vec3 rdir = ray.dir - hit.phong * (Vec3::dot(ray.dir, hit.phong) * 2.0f);
         Ray rray = Ray(hit.point, rdir);
         Hit rhit;
-        return fast_intersection_shader(rray, rhit) ? frag * (1.0f-mat.reflective) + reflection_shader(rray, rhit, N_REFLECTION+1) * mat.reflective : frag;
+        return intersection_shader(rray, rhit) ? frag * (1.0f-mat.reflective) + reflection_shader(rray, rhit, N_REFLECTION+1) * mat.reflective : frag;
     } else return frag;
 }
 

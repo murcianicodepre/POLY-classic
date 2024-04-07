@@ -44,11 +44,14 @@ constexpr uint8_t DISABLE_SHADING = 0x04u;
 constexpr uint8_t DISABLE_BUMP = 0x08u;
 constexpr uint8_t DISABLE_TRANSPARENCY = 0x10u;
 constexpr uint8_t DISABLE_SHADOWS = 0x20u;
+constexpr uint8_t DISABLE_REFLECTIONS = 0x40u;
+constexpr uint8_t DISABLE_REFRACTIONS = 0x80u;
 
 // Debug flags
 constexpr uint8_t DRAW_AABB = 0x01u;
 constexpr uint8_t RENDER_TRIS = 0x02u;
 constexpr uint8_t RENDER_NORMALS = 0x04u;
+constexpr uint8_t DISABLE_FAST_INTERSECTION_SHADER = 0x08u;
 
 // Math defs
 #define PI 3.14159265f
