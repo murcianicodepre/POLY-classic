@@ -1,7 +1,4 @@
 # demo.poly
-debug:
-  - DRAW_AABB
-  - DISABLE_FAST_INTERSECTION_SHADER
 
 camera:
   position: [0.0, 0.0, 0.0]
@@ -38,7 +35,7 @@ objects:
     material: "sky_mat"
     flags:
       - DISABLE_SHADING
-      # - DISABLE_RENDERING
+      - DISABLE_RENDERING
     transforms:
       scale: 5.0
       move: [0.0, 0.0, 3.0]
@@ -55,6 +52,7 @@ objects:
     file: "models/quad.ply"
     material: "floor_mat"
     flags:
+      - DISABLE_RENDERING
     transforms:
       scale: 6.0
       rotate: [90.0, 0.0, 0.0]
@@ -64,6 +62,7 @@ objects:
     file: "models/cone.ply"
     material: "cone_mat"
     flags:
+      - DISABLE_RENDERING
     transforms:
       scale: 0.3
       rotate: [0.0, 0.0, 20.0]
@@ -73,6 +72,7 @@ objects:
     file: "models/cube.ply"
     material: "mirror_mat"
     flags:
+      - DISABLE_RENDERING
     transforms:
       scale: 0.1
       rotate: [-20.0, 45.0, 30.0]

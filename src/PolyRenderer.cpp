@@ -51,8 +51,8 @@ void PolyRenderer::buildBVH(){
 void PolyRenderer::updateNodeBounds(uint32_t nodeId){
     BVHNode& node = bvh[nodeId];
     node.aabbMin = Vec3(1e30f), node.aabbMax = Vec3(1e-30f);
-    for(uint32_t first = node.first, i=0; i<node.n; i++){
-        Tri& tri = tris[triIdx[first+i]];
+    for(uint32_t i=0; i<node.n; i++){
+        Tri& tri = tris[triIdx[node.first+i]];
         node.aabbMin = Vec3::minVec3(node.aabbMin, tri.a.xyz);
         node.aabbMin = Vec3::minVec3(node.aabbMin, tri.b.xyz);
         node.aabbMin = Vec3::minVec3(node.aabbMin, tri.c.xyz);
@@ -71,13 +71,14 @@ void PolyRenderer::subdivide(uint32_t nodeId){
     uint8_t axis = 0u;
     if(ext.y > ext.x) axis = 1;
     if(ext.z > ext[axis]) axis = 2;
+
     float split = node.aabbMin[axis] + ext[axis] * 0.5f;
 
     // Split the geometry in two parts
     uint32_t i = node.first, j = i + node.n - 1;
     while(i<=j){
         Tri& tri = tris[triIdx[i]];
-        if(tri.centroid[axis]>=split) i++;
+        if(tri.centroid[axis]<split) i++;
         else std::swap(triIdx[i], triIdx[j--]);
     }
 
@@ -96,12 +97,11 @@ void PolyRenderer::subdivide(uint32_t nodeId){
     subdivide(leftIdx); subdivide(rightIdx);
 }
 
-void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, bool& bvhIntersection, uint16_t flags){
+void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t flags){
     BVHNode& node = bvh[nodeId];
     if(!node.intersectAABB(ray)) return;
-    bvhIntersection = true;
     if(node.n>0){
-        float z = 1000.0f;
+        float z = hit.point.z;
         Hit aux;
         for(uint32_t i=0; i<node.n; i++){
             Tri& tri = tris[triIdx[node.first+i]];
@@ -120,8 +120,8 @@ void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, bool& bvhIn
         }
 
     } else {
-        intersectBVH(ray, hit, node.left, bvhIntersection, flags);
-        intersectBVH(ray, hit, node.left + 1, bvhIntersection, flags);
+        intersectBVH(ray, hit, node.left, flags);
+        intersectBVH(ray, hit, node.left + 1, flags);
     }
 }
 
@@ -169,8 +169,6 @@ uint16_t PolyRenderer::parseFlags(YAML::Node node){
             flags |= DISABLE_REFLECTIONS;
         else if(flag=="DISABLE_REFRACTIONS")
             flags |= DISABLE_REFRACTIONS;
-        else if(flag=="DRAW_AABB")
-            flags |= (DRAW_AABB<<8);
         else if(flag=="DISABLE_FAST_INTERSECTION_SHADER")
             flags |= (DISABLE_FAST_INTERSECTION_SHADER<<8);
         else PolyRenderer::polyMsg("\e[1;96m  err unknown flag '" + string(flag) + "'\e[0m\n");
@@ -313,7 +311,9 @@ bool PolyRenderer::render(uint8_t threads){
     if(!XInitThreads()){ printf("\e[1;91m X11 err!\e[0m\n"); exit(EXIT_FAILURE); }
     Display* display = XOpenDisplay(nullptr);
     if(!display){ printf("\e[1;91m err opening display!\e[0m\n"); exit(EXIT_FAILURE); }
+
     int screen = DefaultScreen(display);
+
     Window win = XCreateSimpleWindow(display, RootWindow(display, screen), 0,0, WIDTH, HEIGHT, 0, BlackPixel(display, screen), WhitePixel(display, screen));
     XSelectInput(display, win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | ExposureMask);
     XStoreName(display, win, "POLY-classic ~ rendering");
@@ -368,6 +368,7 @@ bool PolyRenderer::render(uint8_t threads){
             {
                 XImage* tileImg = XCreateImage(display, DefaultVisual(display, screen), DefaultDepth(display, screen), 
                                               ZPixmap, 0, nullptr, TILE_SIZE, TILE_SIZE, 32,0);
+
                 tileImg->data = reinterpret_cast<char*>(tile);
 
                 XPutImage(display, win, gc, tileImg, 0,0, bx*TILE_SIZE, by*TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -399,14 +400,11 @@ bool PolyRenderer::render(uint8_t threads){
 RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
     RGBA out;
     Ray ray = cam->rayTo(x, y);
-    Hit hit = {};
+    Hit hit = {.point = {0.0f, 0.0f, 1000.0f}};
     Fragment frag;
 
     // Intersection step: compute closest tri intersection
     if(intersection_shader(ray, hit)){
-        
-        // Debug: draw AABB
-        if(((debug>>8) & DRAW_AABB) && !hit.valid) return RGBA(0,255,255,255);
 
         Tri& tri = tris[hit.tri];
         Material& mat = mats[tri.mat];
@@ -447,9 +445,9 @@ bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint16_t flags){
         }
         return hit.valid;
     } else {
-        bool bvhIntersection = false;
-        intersectBVH(ray, hit, 0, bvhIntersection, flags);
-        return ((flags>>8) & DRAW_AABB) ? bvhIntersection : hit.valid;
+        hit.point.z = 1000.0f;
+        intersectBVH(ray, hit, 0, flags);
+        return hit.valid;
     }
 }
 

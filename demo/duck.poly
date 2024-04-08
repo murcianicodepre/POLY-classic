@@ -1,7 +1,6 @@
 # duck demo
 debug:
-  - DISABLE_REFLECTIONS
-  - DISABLE_FAST_INTERSECTION_SHADER
+  - DISABLE_BUMP
 
 camera:
   position: [0.0, 0.15, 0.0]
@@ -36,7 +35,6 @@ objects:
   - name: "duck"
     file: "models/duck.ply"
     material: "duck_mat"
-    flags:
     transforms:
       rotate: [0.0, 30.0, 0.0]
       move: [0.0, -0.2, 2.0]
@@ -44,8 +42,9 @@ objects:
     file: "models/quad.ply"
     material: "floor_mat"
     flags:
+      - DISABLE_RENDERING
     transforms:
-      scale: 3.0
+      scale: [3.5, 3.0, 1.0]
       rotate: [90.0, 0.0, 0.0]
       move: [0.0, -0.21, 2.0]
 

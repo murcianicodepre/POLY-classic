@@ -40,7 +40,7 @@ public:
     void buildBVH();
     void updateNodeBounds(uint32_t nodeId);
     void subdivide(uint32_t nodeId);
-    void intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, bool& bvhIntersection, uint16_t flags = 0x0000u);
+    void intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t flags = 0x0000u);
 
     // Rendering pipeline shaders
     RGBA compute_pixel(uint16_t x, uint16_t y);
