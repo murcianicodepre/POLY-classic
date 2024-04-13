@@ -8,7 +8,7 @@ project(poly-classic LANGUAGES CXX)
 find_package(PNG REQUIRED)      # Read png textures and write png output
 find_package(yaml-cpp)          # Parse scene script
 find_package(OpenMP REQUIRED)   # OpenMP    
-find_package(X11 REQUIRED)      # Poly GUI
+find_package(X11 REQUIRED)      # Real time rendering window
 
 set(CMAKE_INSTALL_PREFIX "/usr/local/bin")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "..")

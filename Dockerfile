@@ -2,7 +2,8 @@
 FROM alpine:latest
 
 # Update distro and install dependencies
-RUN apk update && apk add --no-cache gcc g++ cmake make libpng-dev openmp git
+RUN apk update && apk add --no-cache gcc g++ cmake make libpng-dev openmp git alpine-conf
+RUN setup-devd udev setup-xorg-base
 
 # First step, clone yaml-cpp and compile the static library
 WORKDIR /

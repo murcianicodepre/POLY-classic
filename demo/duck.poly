@@ -1,4 +1,5 @@
 # duck demo
+
 debug:
   - DISABLE_BUMP
 
@@ -7,21 +8,21 @@ camera:
   fov: 40.0
 
 materials: 
-  - name: "sky_mat"
-    texture: "textures/sky2.png"
-    diffuse: 2.0
-    specular: 0.0
+  
   - name: "duck_mat"
     texture: "textures/duck.png"
     bump: "textures/duck_normal.png"
     diffuse: 2.0
     specular: 32.0
   - name: "floor_mat"
-    texture: "textures/water.png"
-    bump: "textures/water_bump.png"
+    texture: "textures/sand.png"
+    bump: "textures/sand_bump.png"
     diffuse: 2.0
     specular: 32.0
-    reflective: 0.3
+  - name: "sky_mat"
+    texture: "textures/sky2.png"
+    diffuse: 2.0
+    specular: 0.0
 
 objects:
   - name: "sky"
@@ -30,8 +31,8 @@ objects:
     flags:
       - DISABLE_SHADING
     transforms:
-      scale: 5.0
-      move: [0.0, 0.0, 3.0]
+      scale: 3.0
+      move: [0.0, 0.0, 2.0]
   - name: "duck"
     file: "models/duck.ply"
     material: "duck_mat"
@@ -39,13 +40,9 @@ objects:
       rotate: [0.0, 30.0, 0.0]
       move: [0.0, -0.2, 2.0]
   - name: "floor"
-    file: "models/quad.ply"
+    file: "models/sand.ply"
     material: "floor_mat"
-    flags:
-      - DISABLE_RENDERING
     transforms:
-      scale: [3.5, 3.0, 1.0]
-      rotate: [90.0, 0.0, 0.0]
       move: [0.0, -0.21, 2.0]
 
 lights:
@@ -56,4 +53,7 @@ lights:
   - type: "point"
     position: [-0.6, 0.7, 2.0]
     color: [255,0,0]
-    intensity: 1.0
+    intensity: 0.0
+  - type: "ambient"
+    intensity: 0.2
+    color: [255,0,0]

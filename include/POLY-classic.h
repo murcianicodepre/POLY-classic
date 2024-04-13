@@ -11,28 +11,25 @@
 #include <sstream>
 #include <filesystem>
 #include <omp.h>
-#include <thread>
 #include <cmath>
-#include <list>
 #include <vector>
-#include <tuple>
 #include <string>
 #include <cstring>
+#include <csignal>
 #include <optional>
-#include <bitset>
-#include <memory>
 #include "png.h"
 #include "yaml-cpp/yaml.h"
 #include "yaml-cpp/exceptions.h"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xos.h>
 
 // Render pipeline defs
-#define WIDTH 1280
-#define HEIGHT 960
+#define WIDTH 1920
+#define HEIGHT 1080
 #define TEXTURE_SIZE 1024
 #define TILE_SIZE 8
-#define AR 1.333333333f
+#define AR 1.3333333f
 #define MAX_REFLECTIONS 8u
 #define MAX_REFRACTIONS 8u
 #define BLENDER true

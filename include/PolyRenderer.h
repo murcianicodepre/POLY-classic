@@ -32,7 +32,7 @@ public:
 
     // Main program functions
     bool loadScene(const char* scene);
-    bool render(uint8_t threads);
+    bool render(uint8_t threads, bool ENABLE_RENDERING_WINDOW);
     void save(const char* path);
 
     // Acceleration struct

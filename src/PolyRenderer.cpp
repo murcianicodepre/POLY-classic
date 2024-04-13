@@ -7,16 +7,29 @@
 */
 
 std::vector<std::string> msgvector;
+Display* dis = 0;
+Window win;
+GC gc;
+
+// SIGINT signal handler
+void sigintHandler(int sig){
+    printf("\e[1;96m SIGNINT received, rendering stopped\e[0m\n");
+    if(dis) {
+        XFreeGC(dis, gc);
+        XCloseDisplay(dis);
+    }
+    exit(EXIT_FAILURE);
+}
 
 // BVHNode class for acceleration structure
 class BVHNode{
 public:
     Vec3 aabbMin, aabbMax;
-    uint32_t left, first, n;
+    uint32_t n, leftFirst;
     BVHNode();
     bool intersectAABB(Ray&);
 };
-BVHNode::BVHNode() : aabbMin(), aabbMax(), left(0), first(0), n(0) {}
+BVHNode::BVHNode() : aabbMin(), aabbMax(), leftFirst(0u), n(0u) {}
 bool BVHNode::intersectAABB(Ray& ray){
     // Slab test for volume-ray intersection
     float tx1 = (aabbMin.x - ray.ori.x) / ray.dir.x, tx2 = (aabbMax.x - ray.ori.x) / ray.dir.x;
@@ -39,20 +52,20 @@ void PolyRenderer::buildBVH(){
 
     // Assign all tris to root node
     BVHNode& root = bvh[0];
-    root.n = tris.size(); root.first = 0; root.left = 0;
+    root.n = tris.size(); root.leftFirst = 0u;
 
     updateNodeBounds(0);    // Update bounds of root node
     subdivide(0);           // Start subdivision
 
     // Print size of bvh structure
-    PolyRenderer::polyMsg("\e[1;93m compiling bvh: \e[95m" + to_string(nextNode) + " \e[93mnodes \e[92mOK\e[0m\n");
+    PolyRenderer::polyMsg("\e[1;93m compiling bvh: \e[95m" + to_string(nextNode) + " \e[93mnodes (" + to_string(nextNode*sizeof(BVHNode)) + " bytes) \e[92mOK\e[0m\n");
 }
 
 void PolyRenderer::updateNodeBounds(uint32_t nodeId){
     BVHNode& node = bvh[nodeId];
     node.aabbMin = Vec3(1e30f), node.aabbMax = Vec3(1e-30f);
     for(uint32_t i=0; i<node.n; i++){
-        Tri& tri = tris[triIdx[node.first+i]];
+        Tri& tri = tris[triIdx[node.leftFirst+i]];
         node.aabbMin = Vec3::minVec3(node.aabbMin, tri.a.xyz);
         node.aabbMin = Vec3::minVec3(node.aabbMin, tri.b.xyz);
         node.aabbMin = Vec3::minVec3(node.aabbMin, tri.c.xyz);
@@ -75,7 +88,7 @@ void PolyRenderer::subdivide(uint32_t nodeId){
     float split = node.aabbMin[axis] + ext[axis] * 0.5f;
 
     // Split the geometry in two parts
-    uint32_t i = node.first, j = i + node.n - 1;
+    uint32_t i = node.leftFirst, j = i + node.n - 1;
     while(i<=j){
         Tri& tri = tris[triIdx[i]];
         if(tri.centroid[axis]<split) i++;
@@ -83,14 +96,15 @@ void PolyRenderer::subdivide(uint32_t nodeId){
     }
 
     // Terminate if one of the sides is empty
-    uint32_t leftCount = i - node.first;
-    if(leftCount==0 || leftCount==node.n) return;
+    uint32_t leftCount = i - node.leftFirst;
+    if (leftCount==0 || leftCount==node.n) return;
 
     // Create child nodes
+    // if((nextNode+2)>=1536) return;
     uint32_t leftIdx = nextNode++, rightIdx = nextNode++;
-    bvh[leftIdx].first = node.first; bvh[leftIdx].n = leftCount;
-    bvh[rightIdx].first = i; bvh[rightIdx].n = node.n - leftCount;
-    node.left = leftIdx; node.n = 0;
+    bvh[leftIdx].leftFirst = node.leftFirst; bvh[leftIdx].n = leftCount;
+    bvh[rightIdx].leftFirst = i; bvh[rightIdx].n = node.n - leftCount;
+    node.leftFirst = leftIdx; node.n = 0;
     updateNodeBounds(leftIdx); updateNodeBounds(rightIdx);
 
     // Continue recursion
@@ -100,11 +114,11 @@ void PolyRenderer::subdivide(uint32_t nodeId){
 void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t flags){
     BVHNode& node = bvh[nodeId];
     if(!node.intersectAABB(ray)) return;
-    if(node.n>0){
+    if(node.n>0){   // Leaf node; leftFirst contains the index of the first tri
         float z = hit.point.z;
         Hit aux;
         for(uint32_t i=0; i<node.n; i++){
-            Tri& tri = tris[triIdx[node.first+i]];
+            Tri& tri = tris[triIdx[node.leftFirst+i]];
 
             // Discard tri if matches with low byte of flags
             if(tri.flags & static_cast<uint8_t>(flags & 0xffu)) continue;
@@ -114,14 +128,14 @@ void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t fl
                 hit.ray = ray;
                 hit = aux;
                 z = hit.point.z;
-                hit.tri = triIdx[node.first+i];
+                hit.tri = triIdx[node.leftFirst+i];
                 hit.valid = true;
             }
         }
 
-    } else {
-        intersectBVH(ray, hit, node.left, flags);
-        intersectBVH(ray, hit, node.left + 1, flags);
+    } else {    // Node is not leaf, so leftFirst contains the index of the child nodes
+        intersectBVH(ray, hit, node.leftFirst, flags);
+        intersectBVH(ray, hit, node.leftFirst + 1, flags);
     }
 }
 
@@ -206,6 +220,11 @@ bool PolyRenderer::loadScene(const char* path){
         // Parse materials and store material name for object declaration
         if(file["materials"]){
             YAML::Node mats = file["materials"];
+
+            // Insert dummy material for "air"
+            this->mats.push_back(Material(0.0f, 0.0f, 0.0f, 1.0f));
+            mats_names.push_back("VOID_MAT");
+
             for(const auto& m : mats){
                 if(m["name"] && m["diffuse"] && m["specular"]){
                     string mat_name = m["name"].as<string>();
@@ -297,7 +316,7 @@ bool PolyRenderer::loadScene(const char* path){
 }
 
 // Render scene using N threads
-bool PolyRenderer::render(uint8_t threads){
+bool PolyRenderer::render(uint8_t threads, bool ENABLE_RENDERING_WINDOW){
 
     // If global option DISABLE_RENDERING is set, return false directly
     if((debug & 0xffu) & DISABLE_RENDERING){
@@ -307,44 +326,14 @@ bool PolyRenderer::render(uint8_t threads){
 
     float tini, trender;
 
-    // Open display and create X11 window to show rendering at real time
-    if(!XInitThreads()){ printf("\e[1;91m X11 err!\e[0m\n"); exit(EXIT_FAILURE); }
-    Display* display = XOpenDisplay(nullptr);
-    if(!display){ printf("\e[1;91m err opening display!\e[0m\n"); exit(EXIT_FAILURE); }
-
-    int screen = DefaultScreen(display);
-
-    Window win = XCreateSimpleWindow(display, RootWindow(display, screen), 0,0, WIDTH, HEIGHT, 0, BlackPixel(display, screen), WhitePixel(display, screen));
-    XSelectInput(display, win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | ExposureMask);
-    XStoreName(display, win, "POLY-classic ~ rendering");
-    
-    // Set fixed window size
-    XSizeHints sizeHints; sizeHints.flags = PMinSize | PMaxSize;
-    sizeHints.min_width = WIDTH;
-    sizeHints.max_width = WIDTH;
-    sizeHints.min_height = HEIGHT;
-    sizeHints.max_height = HEIGHT;
-    XSetWMNormalHints(display, win, &sizeHints);
-
-    XSetWindowBackground(display, win, 0xff << 16 | 0x00 << 8 | 0xff);
-    XClearWindow(display, win);
-
-    XMapWindow(display, win);
-    GC gc = XCreateGC(display, win, 0, nullptr);
-
-    Atom wmdel = XInternAtom(display, "WM_DELETE_WINDOW", true);
-    XSetWMProtocols(display, win, &wmdel, 1);
-
-    // Wait until the rendering window pops out
-    XEvent event;
-    while(true){
-        XNextEvent(display, &event);
-        if(event.type==Expose) break;
-    }
-
     // Build BVH acceleration struct after scene is loaded
     if(!((debug>>8) & DISABLE_FAST_INTERSECTION_SHADER))
         buildBVH();
+
+    // Create rendering window
+    if(ENABLE_RENDERING_WINDOW){
+        signal(SIGINT, sigintHandler);
+    }
 
     // Start timer and launch rendering threads
     printf("\e[1;93m rendering in %s × %d\e[0m\n", PolyRenderer::getCpu(), threads);
@@ -363,36 +352,13 @@ bool PolyRenderer::render(uint8_t threads){
                     frame[(tx+bx*TILE_SIZE) + (ty+by*TILE_SIZE)*WIDTH] = tile[tx + ty*TILE_SIZE];
                 }
 
-            // Draw tile in rendering window and poll window events
-            #pragma omp critical
-            {
-                XImage* tileImg = XCreateImage(display, DefaultVisual(display, screen), DefaultDepth(display, screen), 
-                                              ZPixmap, 0, nullptr, TILE_SIZE, TILE_SIZE, 32,0);
-
-                tileImg->data = reinterpret_cast<char*>(tile);
-
-                XPutImage(display, win, gc, tileImg, 0,0, bx*TILE_SIZE, by*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            }
             free(tile);
         }
         
     // Compute elapsed time
     trender = static_cast<float>(omp_get_wtime()) - tini;
     printf("\e[1;96m %u \e[93mtris in \e[95m%.3lfs \e[92mOK\e[m\n", static_cast<uint>(tris.size()), trender);
-
-    XStoreName(display, win, string("POLY-classic ~ finished in " + to_string(trender) + "s").c_str());
-
-    // Loop until window is closed
-    while(true){
-        XNextEvent(display, &event);
-        if(event.type==KeyPress){
-            KeySym key = XLookupKeysym(&event.xkey, 0);
-            char keyChar = XKeysymToKeycode(display, key);
-            if(keyChar==0x1b || keyChar==0x03){ XFreeGC(display, gc); XCloseDisplay(display); return true; }
-        }
-        else if(event.type==ClientMessage && event.xclient.data.l[0]==wmdel) { XFreeGC(display, gc); XCloseDisplay(display); return true; }
-    }
-
+    
     return true;
 }
 
@@ -554,6 +520,7 @@ Fragment PolyRenderer::reflection_shader(Ray& ray, Hit& hit, uint8_t N_REFLECTIO
 
 // TODO Refraction shader: compute N refraction
 Fragment PolyRenderer::refraction_shader(Ray& ray, Hit& hit, uint8_t N_REFRACTION){
+    // Ray contains the current medium, hit contains the new medium
     return Fragment();
 }
 
