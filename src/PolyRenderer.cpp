@@ -10,6 +10,9 @@ std::vector<std::string> msgvector;
 Display* dis = 0;
 Window win;
 GC gc;
+int screen;
+Atom wmdel;
+XEvent xe;
 
 // SIGINT signal handler
 void sigintHandler(int sig){
@@ -58,7 +61,7 @@ void PolyRenderer::buildBVH(){
     subdivide(0);           // Start subdivision
 
     // Print size of bvh structure
-    PolyRenderer::polyMsg("\e[1;93m compiling bvh: \e[95m" + to_string(nextNode) + " \e[93mnodes (" + to_string(nextNode*sizeof(BVHNode)) + " bytes) \e[92mOK\e[0m\n");
+    PolyRenderer::polyMsg("\e[1;93m compiling bvh: \e[95m" + to_string(nextNode) + " \e[93mnodes (\e[95m" + to_string(nextNode*sizeof(BVHNode)) + " bytes\e[93m) \e[92mOK\e[0m\n");
 }
 
 void PolyRenderer::updateNodeBounds(uint32_t nodeId){
@@ -229,7 +232,7 @@ bool PolyRenderer::loadScene(const char* path){
                 if(m["name"] && m["diffuse"] && m["specular"]){
                     string mat_name = m["name"].as<string>();
                     float diff = m["diffuse"].as<float>(), spec = m["specular"].as<float>();
-                    float reflect = m["reflective"] ? m["reflective"].as<float>() : 0.0f, refract = m["refractive"] ? m["refractive"].as<float>() : 0.0f;
+                    float reflect = m["reflective"] ? m["reflective"].as<float>() : 0.0f, refract = m["refractive"] ? m["refractive"].as<float>() : 1.0f;
                     Material mat = Material(diff, spec, reflect, refract);
                     if(m["texture"]) mat.loadTexture((script_path + m["texture"].as<string>()).c_str()); 
                     else if(m["color"]) mat.color = parseColor(m["color"]);
@@ -308,7 +311,7 @@ bool PolyRenderer::loadScene(const char* path){
     } catch (const YAML::ParserException& pe){ printf("\e[1;91m exception while parsing '\e[95m%s\e[93m': %s\e[0m\n", path, pe.msg.c_str()); return false; }
 
     // Nice printing
-    system("clear");
+    if(system("clear")<0){ printf("\e[1;91m err clear failed\e[0m\n"); exit(EXIT_FAILURE); }
     printIntro();
     printf("\e[1;93m compiling '\e[95m%s\e[93m' \e[92mOK\e[0m\n", path);
     for(auto s : msgvector) { printf("%s", s.c_str());}
@@ -333,31 +336,100 @@ bool PolyRenderer::render(uint8_t threads, bool ENABLE_RENDERING_WINDOW){
     // Create rendering window
     if(ENABLE_RENDERING_WINDOW){
         signal(SIGINT, sigintHandler);
+        if(!XInitThreads()){ printf("\e[1;91m X11 err!\e[0m\n"); exit(EXIT_FAILURE); }
+        dis = XOpenDisplay(nullptr);
+        if(!dis){ printf("\e[1;91m X11 err: could not open display\e[0m\n"); exit(EXIT_FAILURE); }
+        screen = DefaultScreen(dis);
+
+        XSizeHints sizeHints;
+            sizeHints.flags = PMinSize | PMaxSize; sizeHints.min_width = WIDTH; sizeHints.max_width = WIDTH;
+            sizeHints.min_height = HEIGHT; sizeHints.max_height = HEIGHT;
+
+        XSetWindowAttributes att; 
+            att.background_pixel = 0xff00ffu;        
+
+        win = XCreateSimpleWindow(dis, RootWindow(dis, screen), 0,0, WIDTH, HEIGHT, 1, BlackPixel(dis, screen), WhitePixel(dis, screen));
+        XChangeWindowAttributes(dis, win, CWBackPixel, &att);
+        XSetWMNormalHints(dis, win, &sizeHints);
+        XSelectInput(dis, win, KeyPressMask | ExposureMask | StructureNotifyMask);
+
+        XMapWindow(dis, win);
+        XStoreName(dis, win, "poly-classic ~ rendering");
+
+        gc = XCreateGC(dis, win, 0, nullptr);
+
+        wmdel = XInternAtom(dis, "WM_DELETE_WINDOW", true);
+        XSetWMProtocols(dis, win, &wmdel, 1);
+
+        // Wait until window pop ups
+        while(true){
+            XNextEvent(dis, &xe);
+            if(xe.type==Expose) break;
+        }
     }
 
     // Start timer and launch rendering threads
-    printf("\e[1;93m rendering in %s × %d\e[0m\n", PolyRenderer::getCpu(), threads);
+    printf("\e[1;93m rendering \e[95m%d×%d \e[93min %s × %d\e[0m\n", WIDTH, HEIGHT, PolyRenderer::getCpu(), threads);
     tini = static_cast<float>(omp_get_wtime());
 
     #pragma omp parallel for collapse(2) shared(frame, tris, mats, lights) num_threads(threads) schedule(dynamic)
     for(uint by=0; by<HEIGHT/TILE_SIZE; by++)
         for(uint bx=0; bx<WIDTH/TILE_SIZE; bx++){
-            RGBA* tile = (RGBA*) malloc(sizeof(RGBA) * TILE_SIZE * TILE_SIZE);
+            signal(SIGINT, sigintHandler);
+            RGBA tile[TILE_SIZE*TILE_SIZE];
+            char tileRGB[TILE_SIZE*TILE_SIZE*4];
+            uint32_t x, y;
 
             // Compute tile
-            for(uint ty=0; ty<TILE_SIZE; ty++)
-                for(uint tx=0; tx<TILE_SIZE; tx++){
-                    tile[tx + ty*TILE_SIZE] = compute_pixel(tx + bx*TILE_SIZE, ty + by*TILE_SIZE);
-                    #pragma omp critical
-                    frame[(tx+bx*TILE_SIZE) + (ty+by*TILE_SIZE)*WIDTH] = tile[tx + ty*TILE_SIZE];
+            for(uint8_t ty=0; ty<TILE_SIZE; ty++)
+                for(uint8_t tx=0; tx<TILE_SIZE; tx++){
+                    x = tx + bx*TILE_SIZE, y = ty + by*TILE_SIZE;
+                    tile[tx + ty*TILE_SIZE] = compute_pixel(x, y);
                 }
+            
+            // Copy tile data into global frame
+            for(uint8_t i=0; i<TILE_SIZE; i++){
+                x = bx*TILE_SIZE; y = (by*TILE_SIZE+i) * WIDTH;
+                memcpy((void*) &frame[x+y], (void*) &tile[TILE_SIZE*i], sizeof(RGBA) * TILE_SIZE);
+            }
 
-            free(tile);
+            // Draw tile in render window
+            if(ENABLE_RENDERING_WINDOW){
+                #pragma omp critical
+                {
+                    // TODO: fix x11 rendering window color
+                    for(uint8_t i=0; i<TILE_SIZE*TILE_SIZE; i++){
+                        RGBA& pix = tile[i];
+                        uint8_t aux = pix.r;
+                        pix.r = pix.b; pix.b = aux;
+                    }
+
+                    XImage* img = XCreateImage(dis, DefaultVisual(dis, screen), DefaultDepth(dis, screen), ZPixmap, 0, nullptr, TILE_SIZE, TILE_SIZE, 32,0);
+                    img->data = reinterpret_cast<char*>(tile);
+                    XPutImage(dis, win, gc, img, 0,0, bx*TILE_SIZE, by*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                }
+            }
         }
         
     // Compute elapsed time
     trender = static_cast<float>(omp_get_wtime()) - tini;
     printf("\e[1;96m %u \e[93mtris in \e[95m%.3lfs \e[92mOK\e[m\n", static_cast<uint>(tris.size()), trender);
+
+    // Wait until window is closed
+    if(ENABLE_RENDERING_WINDOW){
+        char buff[56];
+        sprintf(buff, "poly-classic ~ rendering finished in %.3lfs", trender);
+        XStoreName(dis, win, buff);
+        bool loop = true;
+        while(loop){
+            XNextEvent(dis, &xe);
+            if(xe.type==ClientMessage && xe.xclient.data.l[0]==wmdel){
+                XFreeGC(dis, gc);
+                XCloseDisplay(dis);
+                loop = false;
+            }
+        }
+    }
     
     return true;
 }
@@ -381,8 +453,8 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
         // Reflection step: compute N reflection
         frag = (!(tri.flags & (DISABLE_SHADING | DISABLE_REFLECTIONS)) && mat.reflective>1e-3f) ? reflection_shader(ray, hit, 0) : frag;
 
-        // TODO Refraction step: compute N refraction
-        frag = (!(tri.flags & (DISABLE_SHADING | DISABLE_REFRACTIONS )) && mat.refractive>1e-3f) ? refraction_shader(ray, hit, 0) : frag;
+        // Refraction step: compute N refraction
+        frag = (!(tri.flags & (DISABLE_SHADING | DISABLE_REFRACTIONS )) && mat.refractive!=1.0f) ? refraction_shader(ray, hit, 0) : frag;
 
         // Compute final pixel color
         out = RGBA(frag);
@@ -427,8 +499,9 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
     Fragment tex = (!((tri.flags | (debug & 0xffu)) & DISABLE_TEXTURES) && tri.mat<mats.size()) ? texture_shader(hit) : Fragment(1.0f,0.0f,1.0f,1.0f);
 
     // Bump mapping step
-    Vec3 bump = (!((tri.flags | (debug & 0xffu)) & DISABLE_BUMP) && tri.mat<mats.size()) ? bump_shader(hit) : Vec3(1.0f,1.0f,1.0f);
-    hit.phong = hit.phong * bump;
+    hit.phong = (!((tri.flags | (debug & 0xffu)) & DISABLE_BUMP) && tri.mat<mats.size()) ? bump_shader(hit) : hit.phong;
+    //printf("bump: %.3lf, %.3lf, %.3lf\n", hit.phong.x, hit.phong.y, hit.phong.z);
+
 
     // Transparency blending
     if(!((tri.flags | (debug & 0xffu)) & DISABLE_TRANSPARENCY) && tex.a<1.0f){
@@ -450,7 +523,7 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
             // Compute ldir and att depending on the light type
             if(l.get()->type()==LightType::Point){
                 PointLight* pl = dynamic_cast<PointLight*>(l.get());
-                ldir = (pl->pos - hit.point).normalize();
+                ldir = ((pl->pos - hit.point)).normalize();
                 float dist = (pl->pos - hit.point).length();
                 att = 1.0f / (1.0f + 0.14f * dist + 0.07f * (dist*dist));
             } else if(l.get()->type()==LightType::Direction){
@@ -461,7 +534,7 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
 
             // Check if there's geometry between the fragment and the light source
             if(!((tri.flags | (debug & 0xffu)) & DISABLE_SHADOWS)){
-                Vec3 sori = Vec3::dot(ldir, hit.normal) < 0.0f ? hit.point - hit.normal*EPSILON : hit.point + hit.normal*EPSILON;
+                Vec3 sori = Vec3::dot(ldir, hit.normal) < 0.0f ? hit.point - hit.normal*1e-3f : hit.point + hit.normal*1e-3f;
                 Ray lray = Ray(sori, ldir);
                 Hit hit2;
                 if(intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING)) continue;
@@ -502,8 +575,21 @@ Vec3 PolyRenderer::bump_shader(Hit& hit){
         // TODO: convert to tangent coordinates and compute normal vector using bump texture
         uint16_t tx = hit.u * (TEXTURE_SIZE - 1); tx %= (TEXTURE_SIZE-1);
         uint16_t ty = hit.v * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
-        return mat.bump[tx + ty*TEXTURE_SIZE].toVec3() * 2.0f - 1.0f;
-    } else return Vec3(1.0f,1.0f,1.0f);
+
+        // Compute tangent and bitangent
+        Tri& tri = tris[hit.tri];
+        Vec3 e1 = tri.b.xyz - tri.a.xyz, e2 = tri.c.xyz - tri.a.xyz;
+        float du1 = tri.b.u - tri.a.u, dv1 = tri.b.v - tri.a.v;
+        float du2 = tri.c.u - tri.a.u, dv2 = tri.c.v - tri.a.v;
+        float f = 1.0f / (du1 * dv2 - du2 * dv1);
+
+        Vec3 tangent = Vec3(f * (dv2 * e1.x - dv1 * e2.x), f * (dv2 * e1.y - dv1 * e2.y), f * (dv2 * e1.z - dv1 * e2.z)).normalize();
+        Vec3 bitangent = Vec3(f * (du2 * e1.x + -du1 * e2.x), f * (du2 * e1.y + -du1 * e2.y), f * (du2 * e1.z + -du1 * e2.z)).normalize();
+
+        Vec3 bumpMap = mat.bump[tx + ty*TEXTURE_SIZE].toVec3()* 2.0f - 1.0f;
+
+        return (tangent * bumpMap.x + bitangent * bumpMap.y + hit.phong * bumpMap.z).normalize();
+    } else return hit.phong;
 }
 
 // Reflection shader: compute N reflection
@@ -512,7 +598,7 @@ Fragment PolyRenderer::reflection_shader(Ray& ray, Hit& hit, uint8_t N_REFLECTIO
     Fragment frag = fragment_shader(hit);
     if(N_REFLECTION<MAX_REFLECTIONS){   // Check if we hit the limit of reflection rays
         Vec3 rdir = ray.dir - hit.phong * (Vec3::dot(ray.dir, hit.phong) * 2.0f);
-        Ray rray = Ray(hit.point, rdir);
+        Ray rray = Ray(hit.point, rdir); rray.medium = tris[hit.tri].mat;
         Hit rhit;
         return intersection_shader(rray, rhit) ? frag * (1.0f-mat.reflective) + reflection_shader(rray, rhit, N_REFLECTION+1) * mat.reflective : frag;
     } else return frag;
@@ -520,8 +606,26 @@ Fragment PolyRenderer::reflection_shader(Ray& ray, Hit& hit, uint8_t N_REFLECTIO
 
 // TODO Refraction shader: compute N refraction
 Fragment PolyRenderer::refraction_shader(Ray& ray, Hit& hit, uint8_t N_REFRACTION){
+    Fragment frag = fragment_shader(hit);
+    
     // Ray contains the current medium, hit contains the new medium
-    return Fragment();
+    Material& oldMedium = mats[ray.medium], & newMedium = mats[tris[hit.tri].mat];
+    if(N_REFRACTION<MAX_REFRACTIONS){
+        // Snell's Law: n1 * sin(θ1) = n2 * sin(θ2)
+        float cosTheta1 = Vec3::dot(ray.dir, hit.phong) * -1.0f, theta1 = acosf(cosTheta1);
+        float sinTheta2 = (oldMedium.refractive / newMedium.refractive) * sinf(theta1), theta2 = asinf(sinTheta2);
+
+        if(sinTheta2 > 1.0f){
+            // Internal reflection
+            return reflection_shader(ray, hit, 0);
+        } else { // Refraction
+            Vec3 rdir = (ray.dir + hit.phong * cosTheta1) * (oldMedium.refractive / newMedium.refractive) - hit.phong * cosTheta1;
+            Ray rray = Ray(hit.point, rdir); rray.medium = tris[hit.tri].mat;
+            Hit rhit;
+            return intersection_shader(rray, rhit) ? refraction_shader(rray, rhit, N_REFRACTION+1) : frag;
+        }
+    }
+    else return frag;
 }
 
 // Save scene into .png file
@@ -550,7 +654,7 @@ const char* PolyRenderer::getCpu(){
 
 // Print poly-classic intro
 void PolyRenderer::printIntro(){
-    system("clear");
+    if(system("clear")<0){ printf("\e[1;91m err clear failed\e[0m\n"); exit(EXIT_FAILURE); }
     printf(" \e[1;91m▄▄▄   \e[92m▄▄   \e[94m▄  \e[95m▄   ▄ \n");
     printf(" \e[91m█  █ \e[92m█  █  \e[94m█   \e[95m█ █  \e[93m ▄▄ ▄   ▄   ▄▄  ▄▄ ▄  ▄▄\n");
     printf(" \e[91m█▀▀  \e[92m█  █  \e[94m█    \e[95m█  \e[93m █   █  █▄█ ▀▄  ▀▄  █ █\n");

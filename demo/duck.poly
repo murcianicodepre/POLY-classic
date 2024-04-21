@@ -1,8 +1,5 @@
 # duck demo
 
-debug:
-  - DISABLE_BUMP
-
 camera:
   position: [0.0, 0.15, 0.0]
   fov: 40.0
@@ -11,12 +8,12 @@ materials:
   
   - name: "duck_mat"
     texture: "textures/duck.png"
-    bump: "textures/duck_normal.png"
+    bump: "textures/duck_bump.png"
     diffuse: 2.0
     specular: 32.0
   - name: "floor_mat"
-    texture: "textures/sand.png"
-    bump: "textures/sand_bump.png"
+    texture: "textures/cobblestone.png"
+    bump: "textures/cobblestone_bump.png"
     diffuse: 2.0
     specular: 32.0
   - name: "sky_mat"
@@ -42,18 +39,19 @@ objects:
   - name: "floor"
     file: "models/sand.ply"
     material: "floor_mat"
+    flags:
     transforms:
       move: [0.0, -0.21, 2.0]
 
 lights:
   - type: directional
-    direction: [0.5, 1.0, -2.0]
+    direction: [0.5, 1.0, 2.0]
     color: [255,255,255]
     intensity: 0.5
-  - type: "point"
-    position: [-0.6, 0.7, 2.0]
+  - type: point
+    position: [0.5, 1.0, 1.0]
     color: [255,0,0]
-    intensity: 0.0
+    intensity: 0.6
   - type: "ambient"
     intensity: 0.2
     color: [255,0,0]

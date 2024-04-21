@@ -12,7 +12,8 @@ find_package(X11 REQUIRED)      # Real time rendering window
 
 set(CMAKE_INSTALL_PREFIX "/usr/local/bin")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "..")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")    # Debug
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")    # Debug
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 set(CMAKE_CXX_STANDARD 17)
 
 set(SOURCES                 # Set program sources

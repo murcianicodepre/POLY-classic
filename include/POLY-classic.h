@@ -25,8 +25,8 @@
 #include <X11/Xos.h>
 
 // Render pipeline defs
-#define WIDTH 1920
-#define HEIGHT 1080
+#define WIDTH 1280
+#define HEIGHT 960
 #define TEXTURE_SIZE 1024
 #define TILE_SIZE 8
 #define AR 1.3333333f
