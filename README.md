@@ -2,11 +2,11 @@
 90s inspired CPU polygon raytracer
 
 * 1280×960 4:3 rendering output to <code>.png</code>
-* <code>.poly</code> scripts v2 describing objects, materials and ligth sources
-* <code>.ply</code> triangulated 3D models
+* <code>.poly</code> scripts v2 describing objects, materials and light sources
+* <code>.ply</code> 3D models
 * Fully CPU raytracing pipeline with _mind-boggling_ effects:
-    * <code>.png</code> 1024×1024 texture and (TODO) bump mapping
-    * Reflections and (TODO) refractions
+    * <code>.png</code> 1024×1024 textures with bump mapping
+    * Reflections and refractions
     * _Blinn-Phong_ shading with _hard_ shadows
 
 ## Run in docker
@@ -35,7 +35,8 @@ objects:
       move: [0.0, -0.1, 1.0]
 # Finally, define scene lights
 lights:
-  - position: [0.5, 1.0, -1.0]
+  - type: point
+    position: [0.5, 1.0, -1.0]
     color: [255,255,255]
     intensity: 0.8
 ```
