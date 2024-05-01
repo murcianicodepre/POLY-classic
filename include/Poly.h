@@ -27,6 +27,9 @@ public:
     void scale(Vec3 s);
     void scale(float s);
     void rotate(Vec3 r);
+    void rotateX(float r);
+    void rotateY(float r);
+    void rotateZ(float r);
 };
 
 /*
@@ -47,15 +50,18 @@ struct Hit{
 class Tri {
 public:
     Vertex a, b, c;
-    uint16_t mat;
+    uint16_t mat, poly;
     Vec3 centroid;
     uint8_t flags;
-    Tri(Vertex a, Vertex b, Vertex c, uint16_t mat, uint8_t flags);
+    Tri(Vertex a, Vertex b, Vertex c, uint16_t poly, uint16_t mat, uint8_t flags);
     bool intersect(Ray ray, Hit& hit);
     void move(Vec3 m);
     void scale(float s);
     void scale(Vec3 s);
     void rotate(Vec3 r);
+    void rotateX(float r);
+    void rotateY(float r);
+    void rotateZ(float r);
     float min(uint8_t axis);
     float max(uint8_t axis);
 };
@@ -64,11 +70,14 @@ public:
 class Poly {
 public:
     std::vector<Tri> tris;
-    Poly(const char* path, uint16_t mat, uint8_t flags);
+    Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags);
     void move(Vec3 m);
     void scale(Vec3 s);
     void scale(float s);
     void rotate(Vec3 r);
+    void rotateX(float r);
+    void rotateY(float r);
+    void rotateZ(float r);
 };
 
 #endif

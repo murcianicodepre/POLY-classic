@@ -40,16 +40,20 @@ public:
     void buildBVH();
     void updateNodeBounds(uint32_t nodeId);
     void subdivide(uint32_t nodeId);
-    void intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t flags = 0x0000u);
+    void intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t discard = 0x0000u);
 
     // Rendering pipeline shaders
     RGBA compute_pixel(uint16_t x, uint16_t y);
-    bool intersection_shader(Ray& ray, Hit& hit, uint16_t flags = 0x0000u);
-    Fragment fragment_shader(Hit& hit);
-    Fragment texture_shader(Hit& hit);
-    Vec3 bump_shader(Hit& hit);
-    Fragment reflection_shader(Ray&, Hit&, uint8_t);
-    Fragment refraction_shader(Ray&, Hit&, uint8_t);
+    bool intersection_shader(Ray& ray, Hit& hit, uint16_t discard = 0x0000u);
+    Fragment blinn_phong_shading(Hit& hit);
+    Fragment flat_shading(Hit& hit);
+    //Fragment fragment_shader(Hit& hit);
+    Fragment fragment_shader(Hit&);
+    Fragment texture_mapping(Hit& hit);
+    Vec3 bump_mapping(Hit& hit);
+    Fragment reflection_shader(Hit&, uint8_t);
+    Fragment refraction_shader(Hit&, uint8_t);
+    Fragment raytracing_shader(Hit&, uint8_t, uint8_t);
 
     // Other renderer functions
     static RGBA* loadPNG(const char* path);

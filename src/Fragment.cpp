@@ -25,6 +25,7 @@ Fragment::Fragment(RGBA color) :
 Fragment Fragment::operator+ (Fragment frag){ Fragment out = Fragment(r+frag.r, g+frag.g, b+frag.b, a+frag.a); out.clamp(1.0f, 0.0f); return out; }
 Fragment Fragment::operator- (Fragment frag){ Fragment out = Fragment(r-frag.r, g-frag.g, b-frag.b, a-frag.a); out.clamp(1.0f, 0.0f); return out; }
 Fragment Fragment::operator* (Fragment frag){ Fragment out = Fragment(r*frag.r, g*frag.g, b*frag.b, a*frag.a); out.clamp(1.0f, 0.0f); return out; }
+Fragment Fragment::operator* (Vec3 vec){ Fragment out = Fragment(r*vec.x, g*vec.y, b*vec.z, a); out.clamp(1.0f,0.0f); return out; }
 Fragment Fragment::operator+ (float f){ Fragment out = Fragment(r+f, g+f, b+f, a+f); out.clamp(1.0f, 0.0f); return out; }
 Fragment Fragment::operator- (float f){ Fragment out = Fragment(r-f, g-f, b-f, a-f); out.clamp(1.0f, 0.0f); return out; }
 Fragment Fragment::operator* (float f){ Fragment out = Fragment(r*f, g*f, b*f, a*f); out.clamp(1.0f, 0.0f); return out; }

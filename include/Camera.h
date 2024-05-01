@@ -12,11 +12,10 @@
 
 class Camera{
 public:
-    Vec3 ori, rot;
+    Vec3 ori, lookAt;
     float fov;
-    Camera(Vec3 ori, Vec3 rot, float fov);
+    Camera(Vec3 ori, Vec3 lookAt, float fov);
     Ray rayTo(uint16_t x, uint16_t y);
-    void move(Vec3 m);
 };
 
 #endif

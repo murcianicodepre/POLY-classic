@@ -10,8 +10,11 @@ void Vertex::move(Vec3 m){ xyz = xyz + m; }
 void Vertex::scale(Vec3 s){ xyz = Vec3(s.x * xyz.x, s.y * xyz.y, s.z * xyz.z); }   // TODO: correct normal non-uniform scale
 void Vertex::scale(float s){ xyz = xyz * s; normal = normal * s; }
 void Vertex::rotate(Vec3 r){ xyz.rotate(r); normal.rotate(r); }
+void Vertex::rotateX(float r){ xyz.rotateX(r); normal.rotateX(r); }
+void Vertex::rotateY(float r){ xyz.rotateY(r); normal.rotateY(r); }
+void Vertex::rotateZ(float r){ xyz.rotateZ(r); normal.rotateZ(r); }
 
-Tri::Tri(Vertex a, Vertex b, Vertex c, uint16_t mat, uint8_t flags) : a(a), b(b), c(c), mat(mat), flags(flags) {}
+Tri::Tri(Vertex a, Vertex b, Vertex c, uint16_t poly, uint16_t mat, uint8_t flags) : a(a), b(b), c(c), poly(poly), mat(mat), flags(flags) {}
 bool Tri::intersect(Ray ray, Hit& hit){
     Vec3 edge1 = b.xyz - a.xyz, edge2 = c.xyz - a.xyz, h = Vec3::cross(ray.dir, edge2);
 
@@ -34,8 +37,8 @@ bool Tri::intersect(Ray ray, Hit& hit){
         hit.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
 
         // Compute both geometric and phong normals
-        hit.phong = (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize();
         hit.normal = Vec3::cross(a.xyz - hit.point, b.xyz - hit.point).normalize();
+        hit.phong = !(a.normal == 0.0f && b.normal == 0.0f && c.normal == 0.0f) ? (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize() : hit.normal;
 
         return true;
     } else return false;
@@ -44,10 +47,13 @@ void Tri::move(Vec3 m){ a.move(m); b.move(m); c.move(m); }
 void Tri::scale(Vec3 s){ a.scale(s); b.scale(s), c.scale(s); }
 void Tri::scale(float s){ a.scale(s); b.scale(s), c.scale(s); }
 void Tri::rotate(Vec3 r){ a.rotate(r); b.rotate(r); c.rotate(r); }
+void Tri::rotateX(float r){ a.rotateX(r); b.rotateX(r); c.rotateX(r); }
+void Tri::rotateY(float r){ a.rotateY(r); b.rotateY(r); c.rotateY(r); }
+void Tri::rotateZ(float r){ a.rotateZ(r); b.rotateZ(r); c.rotateZ(r); }
 float Tri::min(uint8_t axis){ float m = a.xyz[axis]<b.xyz[axis] ? a.xyz[axis] : b.xyz[axis]; return m<c.xyz[axis] ? m : c.xyz[axis]; }
 float Tri::max(uint8_t axis){ float m = a.xyz[axis]>=b.xyz[axis] ? a.xyz[axis] : b.xyz[axis]; return m>=c.xyz[axis] ? m : c.xyz[axis]; }
 
-Poly::Poly(const char* path, uint16_t mat, uint8_t flags){
+Poly::Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags){
     if(flags & DISABLE_RENDERING) return;
     char buff[128u];
     float x, y, z, nx, ny, nz, u, v;
@@ -58,8 +64,7 @@ Poly::Poly(const char* path, uint16_t mat, uint8_t flags){
     if(!input.is_open()){ PolyRenderer::polyMsg("\e[1;91m  err opening '" + string(path) + "'\e[0m\n"); exit(EXIT_FAILURE); }
 
     // From the header we expect to get the number of faces and vertices, and also check if the vertex data contains the UVs and the normals
-    string element;
-    uint aux = 0;
+    /*uint aux = 0;
     while(element!="end_header" && input.getline(buff, 128u)){
         stringstream iss(buff); iss >> element;
         if(element=="property") aux++;
@@ -68,8 +73,27 @@ Poly::Poly(const char* path, uint16_t mat, uint8_t flags){
             if(element=="vertex"){ iss>>element; nvertex = stoi(element); }
             else { iss>>element; nfaces = stoi(element); }
         }
+    }*/
+
+    string element;
+    bool foundXyz = false, foundNormals = false, foundUVs = false;
+    while(element!="end_header" && input.getline(buff, 128u)){
+        stringstream iss(buff); iss >> element;
+        if(element=="property"){
+            iss >> element; iss>>element;
+            if(element=="x" || element=="y" || element=="z") foundXyz = true;
+            else if(element=="nx" || element=="ny" || element=="nz") foundNormals = true;
+            else if (element=="s" || element=="t") foundUVs = true;
+        } else if(element=="element"){
+            iss >> element;
+            if(element=="vertex"){ iss>>element; nvertex = stoi(element); }
+            else { iss>>element; nfaces = stoi(element); }
+        }
     }
-    if(aux<8){ PolyRenderer::polyMsg("\e[1;91m  err parsing '" + string(path) + "': property missing!\e[0m\n"); exit(EXIT_FAILURE); }
+
+    // Check if at least the vertex are defined in the file. UVs and normals are optional
+    if(!foundXyz){ PolyRenderer::polyMsg("\e[1;91m  err parsing '" + string(path) + "': vertex property missing!\e[0m\n"); exit(EXIT_FAILURE); }
+
 
     // Next we get nvertex lines with the vertex data, followed by nfaces lines with the tri data
     vector<Vertex> vertices;
@@ -78,8 +102,12 @@ Poly::Poly(const char* path, uint16_t mat, uint8_t flags){
         istringstream iss(buff);
         if(i<nvertex){  // Read vertex data: coordinates, normals and UVs, in that order
             iss >> element; x = stof(element); iss >> element; y = stof(element); iss >> element; z = stof(element);
-            iss >> element; nx = stof(element); iss >> element; ny = stof(element); iss >> element; nz = stof(element);
-            iss >> element; u = stof(element); iss >> element; v = stof(element);
+            if(foundNormals){
+                iss >> element; nx = stof(element); iss >> element; ny = stof(element); iss >> element; nz = stof(element);
+            } else { nx = ny = nz = 0.0f; }
+            if(foundUVs){
+                iss >> element; u = stof(element); iss >> element; v = stof(element);
+            } else { u = v = 0.0f; }
 
             Vertex vertex = BLENDER ? Vertex(Vec3(x,z,y), Vec3(nx,nz,ny), u, 1.0f-v) : Vertex(Vec3(x,y,z), Vec3(nx,ny,nz), u, v);
             vertices.push_back(vertex);
@@ -91,7 +119,7 @@ Poly::Poly(const char* path, uint16_t mat, uint8_t flags){
             iss >> element; b = vertices[stoi(element)];
             iss >> element; c = vertices[stoi(element)];
 
-            Tri tri = BLENDER ? Tri(a, c, b, mat, flags) : Tri(a, b, c, mat, flags);
+            Tri tri = BLENDER ? Tri(a, c, b, polyId, mat, flags) : Tri(a, b, c, polyId, mat, flags);
             tris.push_back(tri);
         }
     }
@@ -115,4 +143,16 @@ void Poly::scale(float s){
 void Poly::rotate(Vec3 r){
     #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
     for(Tri& tri : tris) tri.rotate(r);
+}
+void Poly::rotateX(float r){
+    #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+    for(Tri& tri : tris) tri.rotateX(r);
+}
+void Poly::rotateY(float r){
+    #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+    for(Tri& tri : tris) tri.rotateY(r);
+}
+void Poly::rotateZ(float r){
+    #pragma omp parallel for num_threads(omp_get_max_threads()) schedule(static)
+    for(Tri& tri : tris) tri.rotateZ(r);
 }

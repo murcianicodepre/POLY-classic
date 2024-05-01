@@ -16,6 +16,7 @@ Vec3 Vec3::operator* (Vec3 a) { return Vec3(x*a.x, y*a.y, z*a.z); }
 Vec3 Vec3::operator+ (float f) { return Vec3(x+f, y+f, z+f); }
 Vec3 Vec3::operator- (float f) { return Vec3(x-f, y-f, z-f); }
 Vec3 Vec3::operator* (float f) { return Vec3(x*f, y*f, z*f); }
+bool Vec3::operator== (float f) { return x==f && y==f & z==f; }
 float Vec3::length() { return sqrtf(x*x + y*y + z*z); }
 Vec3 Vec3::normalize() { float m = length(); return Vec3(x/m, y/m, z/m); }
 void Vec3::rotateX(float r){ 
@@ -34,9 +35,9 @@ void Vec3::rotateZ(float r){
     y = x0 * sina + y0 * cosa;
 }  
 void Vec3::rotate(Vec3 rot){
-    this->rotateZ(rot.z);
     this->rotateY(rot.y);
     this->rotateX(rot.x);
+    this->rotateZ(rot.z);
 }
 float Vec3::dot(Vec3 a, Vec3 b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
 Vec3 Vec3::cross(Vec3 a, Vec3 b){ return Vec3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }

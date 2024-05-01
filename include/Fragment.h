@@ -19,6 +19,7 @@ public:
     Fragment operator+ (Fragment frag);
     Fragment operator- (Fragment frag);
     Fragment operator* (Fragment frag);
+    Fragment operator* (Vec3 vec);
     Fragment operator+ (float f);
     Fragment operator- (float f);
     Fragment operator* (float f);
