@@ -25,14 +25,14 @@
 #include <X11/Xos.h>
 
 // Render pipeline defs
-#define WIDTH 1280
-#define HEIGHT 960
-#define TEXTURE_SIZE 1024
-#define TILE_SIZE 8
-#define AR 1.3333333f
-#define MAX_REFLECTIONS 8u
-#define MAX_REFRACTIONS 8u
-#define BLENDER true
+constexpr uint8_t WIDTH = 1280;
+constexpr uint8_t HEIGHT = 960;
+constexpr uint8_t TEXTURE_SIZE = 1024;
+constexpr uint8_t TILE_SIZE = 8;
+constexpr float AR = 1.33333f;
+constexpr uint8_t MAX_RAY_BOUNCES = 255u;
+constexpr bool BLENDER = true;
+
 
 // Individual tri rendering flags
 constexpr uint8_t DISABLE_RENDERING = 0x01u;

@@ -473,41 +473,41 @@ Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t
     uint16_t flags = (tri.flags | debug);
 
     Fragment frag = fragment_shader(hit);
+    Vec3 rdir;
+    Ray rray;
+    Hit rhit;
 
     // Reflection step
-    if(!(flags & DISABLE_REFLECTIONS) && mat.reflective>0.0f && N_REFLECTION<MAX_REFLECTIONS){
-        Vec3 rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
-        Ray rray = Ray(hit.point, rdir); rray.medium = tri.mat;
-        Hit rhit;
-        Fragment frag = fragment_shader(hit);
+    if(!(flags & DISABLE_REFLECTIONS) && mat.reflective>0.0f && N_REFLECTION<MAX_RAY_BOUNCES){
+        rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
+        rray = Ray(hit.point, rdir); rray.medium = tri.mat;
         return (intersection_shader(rray, rhit)) ? 
             frag * (1.0f - mat.reflective) + raytracing_shader(rhit, N_REFLECTION+1, N_REFRACTION) * mat.reflective :
             frag;
     }
 
     // Refraction step
-    if(!(flags & DISABLE_REFRACTIONS) && mat.refractive!=1.0f && N_REFRACTION<MAX_REFRACTIONS){
+    if(!(flags & DISABLE_REFRACTIONS) && mat.refractive!=1.0f && N_REFRACTION<MAX_RAY_BOUNCES){
         Material& old = mats[hit.ray.medium];
 
         // Snell's law
         float cosTheta1 = Vec3::dot(hit.ray.dir, hit.phong) * -1.0f, theta1 = acosf(cosTheta1);
         float sinTheta2 = (old.refractive / mat.refractive) * sinf(theta1), theta2 = asinf(sinTheta2);
 
+        Fragment color = Fragment(mat.color);
 
         if(sinTheta2>=1.0f){ // Internal reflection
-            Vec3 rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
-            Ray rray = Ray(hit.point, rdir); rray.medium = tri.mat;
-            Hit rhit;
+            rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
+            rray = Ray(hit.point, rdir); rray.medium = tri.mat;
             return (intersection_shader(rray, rhit)) ?
-                frag * (1.0f - mat.reflective) + raytracing_shader(rhit, N_REFLECTION+1, N_REFRACTION) * mat.reflective :
-                frag;
+                raytracing_shader(rhit, N_REFLECTION+1, N_REFRACTION) * color * Vec3(0.5f) :
+                color;
         } else {
-            Vec3 rdir = (hit.ray.dir + hit.phong * cosTheta1) * (old.refractive / mat.refractive) - hit.phong * cosTheta1;
-            Ray rray = Ray(hit.point, rdir); rray.medium = tris[hit.tri].mat;
-            Hit rhit;
+            rdir = (hit.ray.dir + hit.phong * cosTheta1) * (old.refractive / mat.refractive) - hit.phong * cosTheta1;
+            rray = Ray(hit.point, rdir); rray.medium = tris[hit.tri].mat;
             return (intersection_shader(rray, rhit)) ? 
-                raytracing_shader(rhit, N_REFLECTION, N_REFRACTION+1) * Vec3(0.99f) * mat.color.toVec3() :
-                frag; 
+                raytracing_shader(rhit, N_REFLECTION, N_REFRACTION+1) * color * Vec3(0.99f) :
+                color; 
         }
     }
 
@@ -565,7 +565,6 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
     // ALPHA BLENDING STEP
     if(!(flags & DISABLE_TRANSPARENCY) && tri.mat<mats.size() && tex.a<1.0f){
         Ray rray = Ray(hit.point, ray.dir); rray.medium = tri.mat;
-        printf("jo");
         if(intersection_shader(rray, hit2)) 
             return (out * tex.a) + fragment_shader(hit2);
     }
@@ -666,52 +665,6 @@ Vec3 PolyRenderer::bump_mapping(Hit& hit){
 
         return (tangent * bumpMap.x + bitangent * bumpMap.y + hit.phong * bumpMap.z).normalize();
     } else return hit.phong;
-}
-
-// Reflection shader: compute N reflection
-Fragment PolyRenderer::reflection_shader(Hit& hit, uint8_t N_REFLECTION){
-    Tri& tri = tris[hit.tri];
-    uint8_t flags = tri.flags | static_cast<uint8_t>(debug);
-
-    Vec3 rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
-    Ray rray = Ray(hit.point, rdir); rray.medium = tri.mat;
-    Hit rhit;
-    if(intersection_shader(rray, rhit)){
-        Material& m = mats[tris[rhit.tri].mat];
-        Fragment frag = fragment_shader(rhit);
-        return (!(flags & DISABLE_REFLECTIONS) && N_REFLECTION<MAX_REFLECTIONS && m.reflective>1e-3f) ? 
-            frag * (1.0f - m.reflective) + reflection_shader(rhit, N_REFLECTION+1) * m.reflective : 
-            frag;
-
-    } else return fragment_shader(hit);
-}
-
-// Refraction shader: compute N refraction
-Fragment PolyRenderer::refraction_shader(Hit& hit, uint8_t N_REFRACTION){
-    Tri& tri = tris[hit.tri];
-    uint8_t flags = tri.flags | static_cast<uint8_t>(debug);
-
-    // Tri contains the new medium, ray contains the old medium
-    Material& newMat = mats[tri.mat], & oldMat = mats[hit.ray.medium];
-
-    // Snell's law
-    float cosTheta1 = Vec3::dot(hit.ray.dir, hit.phong) * -1.0f, theta1 = acosf(cosTheta1);
-    float sinTheta2 = (oldMat.refractive / newMat.refractive) * sinf(theta1), theta2 = asinf(sinTheta2);
-
-    if(sinTheta2>1.0f){
-        // Internal reflection
-        return reflection_shader(hit, 0);
-    } else {
-        Vec3 rdir = (hit.ray.dir + hit.phong * cosTheta1) * (oldMat.refractive / newMat.refractive) - hit.phong * cosTheta1;
-        Ray rray = Ray(hit.point, rdir); rray.medium = tris[hit.tri].mat;
-        Hit rhit;
-        if(intersection_shader(rray, rhit)){
-            Material& m = mats[tris[rhit.tri].mat];
-            return (!(flags & DISABLE_REFRACTIONS) && N_REFRACTION<MAX_REFRACTIONS && m.refractive!=1.0f) ? 
-                refraction_shader(rhit, N_REFRACTION+1) * Fragment(newMat.color.toVec3()*0.9f, 1.0f) : 
-                fragment_shader(rhit);
-        } else return fragment_shader(hit);
-    }
 }
 
 // Save scene into .png file
