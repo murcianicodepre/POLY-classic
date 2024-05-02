@@ -16,12 +16,12 @@ void printUsage(){
 int main(int argc, char** argv){
 
     // Parse arguments
-    if(argc<2 || argc>5){ printUsage(); return EXIT_FAILURE; }
+    if(argc<2 || argc>4){ printUsage(); return EXIT_FAILURE; }
 
     bool ENABLE_RENDERING_WINDOW = false;
-    uint nthreads = static_cast<uint8_t>(omp_get_max_threads());
+    uint8_t nthreads = static_cast<uint8_t>(omp_get_max_threads());
     string input, output, outputname;
-    for(uint i=1; i<argc; i++){
+    for(uint8_t i=1; i<argc; i++){
         string arg = string(argv[i]);
         if(arg.length()>3 && arg[0]=='-' && arg[2]=='='){
             string value = arg.substr(3, arg.length()-3);
@@ -40,16 +40,6 @@ int main(int argc, char** argv){
                     outputname = scene.stem(); outputname += ".png";
                     break;
             }
-        } else if(arg.length()==2 && arg[0]=='-') {
-            switch(arg[1]){
-                case 'x' :  // Enable X11 rendering window
-                    ENABLE_RENDERING_WINDOW = true;
-                    break;
-                default:
-                    printUsage();
-                    exit(EXIT_FAILURE);
-            }
-
         } else { printUsage(); return EXIT_FAILURE; }
     }
 

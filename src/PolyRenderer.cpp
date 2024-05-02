@@ -7,20 +7,10 @@
 */
 
 std::vector<std::string> msgvector;
-Display* dis = 0;
-Window win;
-GC gc;
-int screen;
-Atom wmdel;
-XEvent xe;
 
 // SIGINT signal handler
 void sigintHandler(int sig){
     printf("\e[1;96m SIGNINT received, rendering stopped\e[0m\n");
-    if(dis) {
-        XFreeGC(dis, gc);
-        XCloseDisplay(dis);
-    }
     exit(EXIT_FAILURE);
 }
 
@@ -344,41 +334,6 @@ bool PolyRenderer::render(uint8_t threads, bool ENABLE_RENDERING_WINDOW){
     if(!((debug>>8) & DISABLE_FAST_INTERSECTION_SHADER))
         buildBVH();
 
-    // Create rendering window
-    if(ENABLE_RENDERING_WINDOW){
-        signal(SIGINT, sigintHandler);
-        if(!XInitThreads()){ printf("\e[1;91m X11 err!\e[0m\n"); exit(EXIT_FAILURE); }
-        dis = XOpenDisplay(nullptr);
-        if(!dis){ printf("\e[1;91m X11 err: could not open display\e[0m\n"); exit(EXIT_FAILURE); }
-        screen = DefaultScreen(dis);
-
-        XSizeHints sizeHints;
-            sizeHints.flags = PMinSize | PMaxSize; sizeHints.min_width = WIDTH; sizeHints.max_width = WIDTH;
-            sizeHints.min_height = HEIGHT; sizeHints.max_height = HEIGHT;
-
-        XSetWindowAttributes att; 
-            att.background_pixel = 0xff00ffu;        
-
-        win = XCreateSimpleWindow(dis, RootWindow(dis, screen), 0,0, WIDTH, HEIGHT, 1, BlackPixel(dis, screen), WhitePixel(dis, screen));
-        XChangeWindowAttributes(dis, win, CWBackPixel, &att);
-        XSetWMNormalHints(dis, win, &sizeHints);
-        XSelectInput(dis, win, KeyPressMask | ExposureMask | StructureNotifyMask);
-
-        XMapWindow(dis, win);
-        XStoreName(dis, win, "poly-classic ~ rendering");
-
-        gc = XCreateGC(dis, win, 0, nullptr);
-
-        wmdel = XInternAtom(dis, "WM_DELETE_WINDOW", true);
-        XSetWMProtocols(dis, win, &wmdel, 1);
-
-        // Wait until window pop ups
-        while(true){
-            XNextEvent(dis, &xe);
-            if(xe.type==Expose) break;
-        }
-    }
-
     // Start timer and launch rendering threads
     printf("\e[1;93m rendering \e[95m%d×%d \e[93min %s × %d\e[0m\n", WIDTH, HEIGHT, PolyRenderer::getCpu(), threads);
     tini = static_cast<float>(omp_get_wtime());
@@ -403,44 +358,11 @@ bool PolyRenderer::render(uint8_t threads, bool ENABLE_RENDERING_WINDOW){
                 x = bx*TILE_SIZE; y = (by*TILE_SIZE+i) * WIDTH;
                 memcpy((void*) &frame[x+y], (void*) &tile[TILE_SIZE*i], sizeof(RGBA) * TILE_SIZE);
             }
-
-            // Draw tile in render window
-            if(ENABLE_RENDERING_WINDOW){
-                #pragma omp critical
-                {
-                    // TODO: fix x11 rendering window color
-                    for(uint8_t i=0; i<TILE_SIZE*TILE_SIZE; i++){
-                        RGBA& pix = tile[i];
-                        uint8_t aux = pix.r;
-                        pix.r = pix.b; pix.b = aux;
-                    }
-
-                    XImage* img = XCreateImage(dis, DefaultVisual(dis, screen), DefaultDepth(dis, screen), ZPixmap, 0, nullptr, TILE_SIZE, TILE_SIZE, 32,0);
-                    img->data = reinterpret_cast<char*>(tile);
-                    XPutImage(dis, win, gc, img, 0,0, bx*TILE_SIZE, by*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                }
-            }
         }
         
     // Compute elapsed time
     trender = static_cast<float>(omp_get_wtime()) - tini;
     printf("\e[1;96m %u \e[93mtris in \e[95m%.3lfs \e[92mOK\e[m\n", static_cast<uint>(tris.size()), trender);
-
-    // Wait until window is closed
-    if(ENABLE_RENDERING_WINDOW){
-        char buff[56];
-        sprintf(buff, "poly-classic ~ rendering finished in %.3lfs", trender);
-        XStoreName(dis, win, buff);
-        bool loop = true;
-        while(loop){
-            XNextEvent(dis, &xe);
-            if(xe.type==ClientMessage && xe.xclient.data.l[0]==wmdel){
-                XFreeGC(dis, gc);
-                XCloseDisplay(dis);
-                loop = false;
-            }
-        }
-    }
     
     return true;
 }
@@ -457,7 +379,6 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
         Material& mat = mats[tri.mat];
         uint16_t flags = (tri.flags | debug);
 
-        //out = ((mat.reflective>0.0f || mat.refractive!=0.0f) && !(flags & (DISABLE_REFLECTIONS | DISABLE_REFRACTIONS)) && !((flags>>8) & FLAT_SHADING)) ?
         out = ((mat.reflective>0.0f && !(flags & DISABLE_REFLECTIONS)) || (mat.refractive!=1.0f && !(flags & DISABLE_REFRACTIONS))) ? 
             raytracing_shader(hit, 0,0):
             fragment_shader(hit);
@@ -606,11 +527,7 @@ Fragment PolyRenderer::blinn_phong_shading(Hit& hit){
                 Hit hit2;
 
                 // Check intersecion with other geometry; self shadowing not allowed
-                bool intersection = intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING) && tri.poly!=tris[hit2.tri].poly;
-                Material& m = mats[tris[hit2.tri].mat];
-                //if(intersection && m.refractive!=1.0f){ blinn_phong = blinn_phong * (m.color.toVec3() * l.get()->color.toVec3() * att); }
-                //else if(intersection) continue;
-                if(intersection) continue;
+                if(intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING) && tri.poly!=tris[hit2.tri].poly) continue;
             }
 
             // Compute fragment's specular and diffuse components

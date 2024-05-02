@@ -20,14 +20,13 @@
 #include "png.h"
 #include "yaml-cpp/yaml.h"
 #include "yaml-cpp/exceptions.h"
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
+
+typedef uint32_t uint;
 
 // Render pipeline defs
-constexpr uint8_t WIDTH = 1280;
-constexpr uint8_t HEIGHT = 960;
-constexpr uint8_t TEXTURE_SIZE = 1024;
+constexpr uint16_t WIDTH = 1280;
+constexpr uint16_t HEIGHT = 960;
+constexpr uint16_t TEXTURE_SIZE = 1024;
 constexpr uint8_t TILE_SIZE = 8;
 constexpr float AR = 1.33333f;
 constexpr uint8_t MAX_RAY_BOUNCES = 255u;

@@ -64,17 +64,6 @@ Poly::Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags){
     if(!input.is_open()){ PolyRenderer::polyMsg("\e[1;91m  err opening '" + string(path) + "'\e[0m\n"); exit(EXIT_FAILURE); }
 
     // From the header we expect to get the number of faces and vertices, and also check if the vertex data contains the UVs and the normals
-    /*uint aux = 0;
-    while(element!="end_header" && input.getline(buff, 128u)){
-        stringstream iss(buff); iss >> element;
-        if(element=="property") aux++;
-        else if(element=="element"){
-            iss >> element;
-            if(element=="vertex"){ iss>>element; nvertex = stoi(element); }
-            else { iss>>element; nfaces = stoi(element); }
-        }
-    }*/
-
     string element;
     bool foundXyz = false, foundNormals = false, foundUVs = false;
     while(element!="end_header" && input.getline(buff, 128u)){

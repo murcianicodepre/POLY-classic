@@ -8,7 +8,6 @@ project(poly-classic LANGUAGES CXX)
 find_package(PNG REQUIRED)      # Read png textures and write png output
 find_package(yaml-cpp)          # Parse scene script
 find_package(OpenMP REQUIRED)   # OpenMP    
-find_package(X11 REQUIRED)      # Real time rendering window
 
 set(CMAKE_INSTALL_PREFIX "/usr/local/bin")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "..")
@@ -36,13 +35,11 @@ target_link_libraries(poly-classic
     PNG::PNG 
     ${YAML_CPP_LIBRARIES}
     OpenMP::OpenMP_CXX
-    X11
 )
 
 # Add include folder
 target_include_directories(poly-classic PRIVATE 
     "include"
-    ${X11_INCLUDE_DIR}
 )
 
 install(TARGETS poly-classic    # Makefile output directory 
