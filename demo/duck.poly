@@ -1,5 +1,8 @@
 # duck demo
 
+debug:
+  - FLAT_SHADING
+
 camera:
   position: [0.0, 0.15, 0.0]
   fov: 40.0
@@ -32,7 +35,7 @@ objects:
       scale: 3.0
       move: [0.0, 0.0, 2.0]
   - name: "duck"
-    file: "models/duck.ply"
+    file: "models/duck2.ply"
     material: "duck_mat"
     transforms:
       rotate: [0.0, 30.0, 0.0]
@@ -41,6 +44,7 @@ objects:
     file: "models/sand.ply"
     material: "floor_mat"
     flags:
+      - DISABLE_RENDERING
     transforms:
       move: [0.0, -0.21, 2.0]
 

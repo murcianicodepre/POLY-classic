@@ -30,14 +30,17 @@ bool Tri::intersect(Ray ray, Hit& hit){
     if(V<0 || (U+V)>1.0f) return false;
 
     float t = inv * Vec3::dot(edge2, q);
-    if(t>EPSILON){  // Hit!
+    Vec3 normal = Vec3::cross(edge1, edge2).normalize();
+    if(t>EPSILON && Vec3::dot(ray.dir, normal)<0.0f){  // Hit!
+
         hit.point = ray.point(t);
+        hit.normal = normal;
+
         hit.ray = ray;
         hit.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
         hit.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
 
-        // Compute both geometric and phong normals
-        hit.normal = Vec3::cross(a.xyz - hit.point, b.xyz - hit.point).normalize();
+        // Compute interpolated normal
         hit.phong = !(a.normal == 0.0f && b.normal == 0.0f && c.normal == 0.0f) ? (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize() : hit.normal;
 
         return true;
@@ -98,7 +101,7 @@ Poly::Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags){
                 iss >> element; u = stof(element); iss >> element; v = stof(element);
             } else { u = v = 0.0f; }
 
-            Vertex vertex = BLENDER ? Vertex(Vec3(x,z,y), Vec3(nx,nz,ny), u, 1.0f-v) : Vertex(Vec3(x,y,z), Vec3(nx,ny,nz), u, v);
+            Vertex vertex = Vertex(Vec3(x,y,z), Vec3(nx,ny,nz), u, 1.0f-v);
             vertices.push_back(vertex);
 
         } else {        // Read tri data. Check if the line starts whith a 3
@@ -108,7 +111,7 @@ Poly::Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags){
             iss >> element; b = vertices[stoi(element)];
             iss >> element; c = vertices[stoi(element)];
 
-            Tri tri = BLENDER ? Tri(a, c, b, polyId, mat, flags) : Tri(a, b, c, polyId, mat, flags);
+            Tri tri = Tri(a, b, c, polyId, mat, flags);
             tris.push_back(tri);
         }
     }

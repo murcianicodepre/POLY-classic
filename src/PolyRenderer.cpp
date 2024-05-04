@@ -93,7 +93,6 @@ void PolyRenderer::subdivide(uint32_t nodeId){
     if (leftCount==0 || leftCount==node.n) return;
 
     // Create child nodes
-    // if((nextNode+2)>=1536) return;
     uint32_t leftIdx = nextNode++, rightIdx = nextNode++;
     bvh[leftIdx].leftFirst = node.leftFirst; bvh[leftIdx].n = leftCount;
     bvh[rightIdx].leftFirst = i; bvh[rightIdx].n = node.n - leftCount;
@@ -379,7 +378,8 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
         Material& mat = mats[tri.mat];
         uint16_t flags = (tri.flags | debug);
 
-        out = ((mat.reflective>0.0f && !(flags & DISABLE_REFLECTIONS)) || (mat.refractive!=1.0f && !(flags & DISABLE_REFRACTIONS))) ? 
+        out = (!((flags>>8u) & FLAT_SHADING) && 
+            ((mat.reflective>0.0f && !(flags & DISABLE_REFLECTIONS)) || (mat.refractive!=1.0f && !(flags & DISABLE_REFRACTIONS)))) ? 
             raytracing_shader(hit, 0,0):
             fragment_shader(hit);
     }
@@ -399,7 +399,7 @@ Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t
     Hit rhit;
 
     // Reflection step
-    if(!(flags & DISABLE_REFLECTIONS) && mat.reflective>0.0f && N_REFLECTION<MAX_RAY_BOUNCES){
+    if(!(flags & (DISABLE_REFLECTIONS | DISABLE_SHADING)) && mat.reflective>0.0f && N_REFLECTION<MAX_RAY_BOUNCES){
         rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
         rray = Ray(hit.point, rdir); rray.medium = tri.mat;
         return (intersection_shader(rray, rhit)) ? 
@@ -408,7 +408,7 @@ Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t
     }
 
     // Refraction step
-    if(!(flags & DISABLE_REFRACTIONS) && mat.refractive!=1.0f && N_REFRACTION<MAX_RAY_BOUNCES){
+    if(!(flags & (DISABLE_REFRACTIONS | DISABLE_SHADING)) && mat.refractive!=1.0f && N_REFRACTION<MAX_RAY_BOUNCES){
         Material& old = mats[hit.ray.medium];
 
         // Snell's law
@@ -547,7 +547,7 @@ Fragment PolyRenderer::blinn_phong_shading(Hit& hit){
 
 // Flat shader: compute flat shading for given hit
 Fragment PolyRenderer::flat_shading(Hit& hit){
-    return Fragment(Vec3(1.0f,1.0f,1.0f) * max(0.0f, Vec3::dot(hit.normal, hit.ray.ori)), 1.0f);    
+    return Fragment(Vec3(1.0f,1.0f,1.0f) * max(0.0f, Vec3::dot(hit.normal, (hit.ray.ori - hit.point).normalize())), 1.0f);    
 }
 
 // Texture shader: compute texel from tri texture and hit UV coordinates
@@ -576,7 +576,7 @@ Vec3 PolyRenderer::bump_mapping(Hit& hit){
         float f = 1.0f / (du1 * dv2 - du2 * dv1);
 
         Vec3 tangent = Vec3(f * (dv2 * e1.x - dv1 * e2.x), f * (dv2 * e1.y - dv1 * e2.y), f * (dv2 * e1.z - dv1 * e2.z)).normalize();
-        Vec3 bitangent = Vec3(f * (du2 * e1.x + -du1 * e2.x), f * (du2 * e1.y + -du1 * e2.y), f * (du2 * e1.z + -du1 * e2.z)).normalize();
+        Vec3 bitangent = Vec3(f * (-du2 * e1.x + du1 * e2.x), f * (-du2 * e1.y + du1 * e2.y), f * (-du2 * e1.z + du1 * e2.z)).normalize();
 
         Vec3 bumpMap = mat.bump[tx + ty*TEXTURE_SIZE].toVec3()* 2.0f - 1.0f;
 
