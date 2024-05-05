@@ -7,8 +7,8 @@
 
 Vertex::Vertex(Vec3 xyz, Vec3 normal, float u, float v) : xyz(xyz), normal(normal), u(u), v(v) {}
 void Vertex::move(Vec3 m){ xyz = xyz + m; }
-void Vertex::scale(Vec3 s){ xyz = Vec3(s.x * xyz.x, s.y * xyz.y, s.z * xyz.z); }   // TODO: correct normal non-uniform scale
-void Vertex::scale(float s){ xyz = xyz * s; normal = normal * s; }
+void Vertex::scale(Vec3 s){ xyz = Vec3(s.x * xyz.x, s.y * xyz.y, s.z * xyz.z); }
+void Vertex::scale(float s){ xyz = xyz * s; normal = (normal*s).normalize();  }
 void Vertex::rotate(Vec3 r){ xyz.rotate(r); normal.rotate(r); }
 void Vertex::rotateX(float r){ xyz.rotateX(r); normal.rotateX(r); }
 void Vertex::rotateY(float r){ xyz.rotateY(r); normal.rotateY(r); }
@@ -33,6 +33,7 @@ bool Tri::intersect(Ray ray, Hit& hit){
     Vec3 normal = Vec3::cross(edge1, edge2).normalize();
     if(t>EPSILON && Vec3::dot(ray.dir, normal)<0.0f){  // Hit!
 
+        hit.t = t;
         hit.point = ray.point(t);
         hit.normal = normal;
 

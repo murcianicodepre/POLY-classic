@@ -10,13 +10,13 @@ materials:
     diffuse: 0.0
     specular: 0.0
   - name: "cube_mat"
-    texture: "textures/beso.png"
+    texture: "textures/demo_texture.png"
     diffuse: 2.0
     specular: 16.0
 
   - name: "mat1"
-    texture: "textures/space_jockey.png"
-    bump: "textures/space_jockey_bump.png"
+    texture: "textures/cobblestone.png"
+    bump: "textures/cobblestone_bump.png"
     diffuse: 2.0
     specular: 32.0
 
@@ -34,26 +34,33 @@ objects:
     file: "models/cube.ply"
     material: "cube_mat"
     flags:
-      - DISABLE_RENDERING
     transforms:
       scale: 0.2
       rotate: [-20.0, 45.0, 0.0]
       move: [0.0, 0.06, 1.5]
 
-  - name: "space_jockey"
-    file: "models/space_jockey.ply"
+  - name: "floor"
+    file: "models/quad2.ply"
     material: "mat1"
     transforms:
-      scale: 0.08
-      rotate: [0.0, 70.0, 0.0]
-      move: [0.0, -0.6, 1.5]
+      scale: 2.0
+      rotate: [90.0, 0.0, 0.0]
+      move: [0.0, -0.3, 1.5]
+  
+  - name: "roof"
+    file: "models/quad2.ply"
+    material: "mat1"
+    transforms:
+      scale: 2.0
+      rotate: [-90.0, 0.0, 0.0]
+      move: [0.0, 0.6, 1.5]
 
 lights:
   - type: directional
-    direction: [0.5, 1.0, -1.0]
+    direction: [0.0, 1.0, -1.0]
     color: [255,255,255]
-    intensity: 0.5
+    intensity: 0.0
   - type: point
-    position: [0.0, 0.0, 0.5]
-    color: [255,0,0]
-    intensity: 0.3
+    position: [0.5, 0.3, -1.0]
+    color: [255,255,255]
+    intensity: 0.8

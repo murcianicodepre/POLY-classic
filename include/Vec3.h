@@ -20,9 +20,11 @@ public:
     Vec3 operator+ (Vec3 a);
     Vec3 operator- (Vec3 a);
     Vec3 operator* (Vec3 a);
+    Vec3 operator/ (Vec3 a);
     Vec3 operator+ (float f);
     Vec3 operator- (float f);
     Vec3 operator* (float f);
+    Vec3 operator/ (float f);
     bool operator== (float f);
     float length();
     Vec3 normalize();

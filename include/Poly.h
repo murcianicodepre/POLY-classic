@@ -44,6 +44,7 @@ struct Hit{
     float u = 0.0f, v = 0.0f;
     Ray ray;
     bool valid = false;
+    float t;
 };
 
 // Tri class

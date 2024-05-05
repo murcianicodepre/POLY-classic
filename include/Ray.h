@@ -16,6 +16,7 @@ public:
     Ray();
     Ray(Vec3 ori, Vec3 dir);
     Vec3 point(float t);
+    float getT(Vec3 point);
 };
 
 #endif

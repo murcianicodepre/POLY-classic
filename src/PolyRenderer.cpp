@@ -172,10 +172,14 @@ uint16_t PolyRenderer::parseFlags(YAML::Node node){
             flags |= DISABLE_REFLECTIONS;
         else if(flag=="DISABLE_REFRACTIONS")
             flags |= DISABLE_REFRACTIONS;
-        else if(flag=="DISABLE_FAST_INTERSECTION_SHADER")
+        else if(flag=="DISABLE_FAST_INTERSECTION_SHADER"){
+            PolyRenderer::polyMsg("\e[1;96m  DISABLE_FAST_INTERSECTION_SHADER\e[0m\n");
             flags |= (DISABLE_FAST_INTERSECTION_SHADER<<8);
-        else if(flag=="FLAT_SHADING")
+        }
+        else if(flag=="FLAT_SHADING"){
+            PolyRenderer::polyMsg("\e[1;96m  FLAT_SHADING\e[0m\n");
             flags |= (FLAT_SHADING<<8);
+        }
         else PolyRenderer::polyMsg("\e[1;96m  err unknown flag '" + string(flag) + "'\e[0m\n");
         
     }
@@ -440,7 +444,7 @@ bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint16_t discard){
 
     // TODO: fix slow intersection shader
     if ((debug>>8) & DISABLE_FAST_INTERSECTION_SHADER){
-        float z = 1000.0f;
+        float minDist = fabs(1000.0f - ray.ori.z);
         Hit aux;
         for(uint32_t i=0; i<tris.size(); i++){
             Tri& tri = tris[i];
@@ -449,8 +453,9 @@ bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint16_t discard){
             if(tri.flags & static_cast<uint8_t>(discard & 0xffu)) continue;
 
             // Intersection test
-            if(tri.intersect(ray, aux) /*&& aux.point.z<z*/){
-                hit = aux; z = hit.point.z; hit.tri = i; hit.valid = true; hit.ray = ray;
+            if(tri.intersect(ray, aux) && fabs(aux.point.z - ray.ori.z) < minDist){
+                hit = aux; hit.tri = i; hit.valid = true; hit.ray = ray;
+                minDist = fabs(aux.point.z - ray.ori.z);
             }
         }
         return hit.valid;
@@ -505,29 +510,32 @@ Fragment PolyRenderer::blinn_phong_shading(Hit& hit){
 
         for(auto& l : lights){
             if(l.get()->intensity<1e-3f) continue;
-            Vec3 ldir, half;
-            float att;
+            Vec3 ldir, lpos, half;
+            float att, dist;
 
             // Compute ldir and att depending on the light type
             if(l.get()->type()==LightType::Point){
                 PointLight* pl = dynamic_cast<PointLight*>(l.get());
-                ldir = ((pl->pos - hit.point)).normalize();
-                float dist = (pl->pos - hit.point).length();
+                lpos = pl->pos;
+                ldir = ((lpos - hit.point)).normalize();
+                dist = (lpos - hit.point).length();
                 att = 1.0f / (1.0f + 0.14f * dist + 0.07f * (dist*dist));
             } else if(l.get()->type()==LightType::Direction){
                 DirectionalLight* dl = dynamic_cast<DirectionalLight*>(l.get());
+                lpos = Vec3(1000.0f);
                 ldir = (dl->dir).normalize(); 
+                dist = __FLT_MAX__;
                 att = 1.0f;
             } else { blinn_phong = blinn_phong + l.get()->color.toVec3() * l.get()->intensity; continue; }
 
             // SHADOW MAPPING STEP: check if there's geometry between the fragment and the light source
             if(!(flags & DISABLE_SHADOWS)){
-                Vec3 sori = Vec3::dot(ldir, hit.normal) < 0.0f ? hit.point - hit.normal*EPSILON : hit.point + hit.normal*EPSILON;
+                Vec3 sori = Vec3::dot(ldir, hit.normal) < 0.0f ? hit.point + hit.normal*EPSILON : hit.point + hit.normal*EPSILON;
                 Ray lray = Ray(sori, ldir);
                 Hit hit2;
 
-                // Check intersecion with other geometry; self shadowing not allowed
-                if(intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING) && tri.poly!=tris[hit2.tri].poly) continue;
+                // Check intersecion with other geometry
+                if(intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING) /*&& (tri.poly!=tris[hit2.tri].poly)*/ && (hit2.t<lray.getT(lpos))) continue;
             }
 
             // Compute fragment's specular and diffuse components
@@ -576,7 +584,7 @@ Vec3 PolyRenderer::bump_mapping(Hit& hit){
         float f = 1.0f / (du1 * dv2 - du2 * dv1);
 
         Vec3 tangent = Vec3(f * (dv2 * e1.x - dv1 * e2.x), f * (dv2 * e1.y - dv1 * e2.y), f * (dv2 * e1.z - dv1 * e2.z)).normalize();
-        Vec3 bitangent = Vec3(f * (-du2 * e1.x + du1 * e2.x), f * (-du2 * e1.y + du1 * e2.y), f * (-du2 * e1.z + du1 * e2.z)).normalize();
+        Vec3 bitangent = Vec3(f * (du2 * e1.x - du1 * e2.x), f * (du2 * e1.y - du1 * e2.y), f * (du2 * e1.z - du1 * e2.z)).normalize();
 
         Vec3 bumpMap = mat.bump[tx + ty*TEXTURE_SIZE].toVec3()* 2.0f - 1.0f;
 

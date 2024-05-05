@@ -1,9 +1,5 @@
 # klein.poly ~ refraction test
 
-debug:
-  - DISABLE_REFLECTIONS
-  - DISABLE_REFRACTIONS
-
 camera:
   position: [0.2, 0.5, -0.5]
   fov: 35.0
@@ -31,7 +27,7 @@ materials:
     color: [255,255,0]
     diffuse: 2.0
     specular: 32.0
-    refractive: 2.4168
+    refractive: 1.7442
     
   - name: "tablemat"
     texture: "textures/table.png"

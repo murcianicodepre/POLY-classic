@@ -37,26 +37,11 @@ objects:
       scale: 3.0
       move: [0.0, 0.0, 1.5]
 
-  - name: "klein"
-    file: "models/klein.ply"
-    material: "mat2"
-    transforms:
-      scale: 0.3
-      move: [0.35, -0.3, 1.0]
-
   - name: "sphere2"
     file: "models/sphere.ply"
-    material: "mat"
+    material: "mat2"
     transforms:
-      scale: 0.5
       move: [0.0, 0.0, 3.0]
-  
-  - name: "sphere3"
-    file: "models/sphere.ply"
-    material: "mat3"
-    transforms:
-      scale: 0.3
-      move: [-0.35, 0.0, 1.0]
 
 lights:
   - type: point

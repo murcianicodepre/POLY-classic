@@ -13,12 +13,14 @@ float Vec3::operator[] (const uint8_t i){ return i==0 ? x : (i==1 ? y : z); }
 Vec3 Vec3::operator+ (Vec3 a) { return Vec3(x+a.x, y+a.y, z+a.z); }
 Vec3 Vec3::operator- (Vec3 a) { return Vec3(x-a.x, y-a.y, z-a.z); }
 Vec3 Vec3::operator* (Vec3 a) { return Vec3(x*a.x, y*a.y, z*a.z); }
+Vec3 Vec3::operator/ (Vec3 a) { return Vec3(x/a.x, y/a.y, z/a.z); }
 Vec3 Vec3::operator+ (float f) { return Vec3(x+f, y+f, z+f); }
 Vec3 Vec3::operator- (float f) { return Vec3(x-f, y-f, z-f); }
 Vec3 Vec3::operator* (float f) { return Vec3(x*f, y*f, z*f); }
+Vec3 Vec3::operator/ (float f) { return Vec3(x/f, y/f, z/f); }
 bool Vec3::operator== (float f) { return x==f && y==f & z==f; }
 float Vec3::length() { return sqrtf(x*x + y*y + z*z); }
-Vec3 Vec3::normalize() { float m = length(); return Vec3(x/m, y/m, z/m); }
+Vec3 Vec3::normalize() { float m = length(); return (m!=0.0f) ? Vec3(x/m, y/m, z/m) : Vec3(x,y,z); }
 void Vec3::rotateX(float r){ 
     float a = r*ALPHA, y0 = y, z0 = z, cosa = cosf(a), sina = sinf(a);
     y = y0 * cosa - z0 * sina;
