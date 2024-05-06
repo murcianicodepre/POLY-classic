@@ -9,7 +9,7 @@
 
 /* Print usage */
 void printUsage(){
-    printf("\e[1;93m Usage: \e[91mp\e[92mo\e[94ml\e[95my \e[93mclassic \e[95m-i=SCENE.POLY \e[96m [-t=THREADS] [-o=OUTPUT_PATH] [-x]\e[0m\n");
+    printf("\e[1;93m Usage: \e[91mp\e[92mo\e[94ml\e[95my \e[93mclassic \e[95m-i=SCENE.POLY \e[96m [-t=THREADS] [-o=OUTPUT_PATH]\e[0m\n");
 }
 
 /* Application entrypoint */

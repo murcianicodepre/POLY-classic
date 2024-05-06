@@ -12,6 +12,7 @@ RUN mkdir build && cd build && cmake .. && make && make install
 
 # Second step, copy source inside /app and compile poly-classic
 WORKDIR /app
+RUN rm -fr /yaml-cpp
 COPY CMakeLists.txt CMakeLists.txt
 COPY include include
 COPY src src
