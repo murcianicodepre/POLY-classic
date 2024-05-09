@@ -1,11 +1,8 @@
 # duck demo
 
-debug:
-  - FLAT_SHADING
-
 camera:
   position: [0.0, 0.15, 0.0]
-  fov: 40.0
+  fov: 30.0
 
 materials: 
   
@@ -14,14 +11,9 @@ materials:
     bump: "textures/duck_bump.png"
     diffuse: 2.0
     specular: 32.0
-  - name: "floor_mat"
-    texture: "textures/water.png"
-    bump: "textures/bump2.png"
-    diffuse: 2.0
-    specular: 32.0
-    reflective: 0.5
+    refractive: 1.333
   - name: "sky_mat"
-    texture: "textures/sky2.png"
+    texture: "textures/sky3.png"
     diffuse: 2.0
     specular: 0.0
 
@@ -40,13 +32,6 @@ objects:
     transforms:
       rotate: [0.0, 30.0, 0.0]
       move: [0.0, -0.2, 2.0]
-  - name: "floor"
-    file: "models/sand.ply"
-    material: "floor_mat"
-    flags:
-      - DISABLE_RENDERING
-    transforms:
-      move: [0.0, -0.21, 2.0]
 
 lights:
   - type: directional

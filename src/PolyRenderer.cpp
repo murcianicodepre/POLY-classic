@@ -384,7 +384,7 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
 
         out = (!((flags>>8u) & FLAT_SHADING) && 
             ((mat.reflective>0.0f && !(flags & DISABLE_REFLECTIONS)) || (mat.refractive!=1.0f && !(flags & DISABLE_REFRACTIONS)))) ? 
-            raytracing_shader(hit, 0,0):
+            reflection_refraction_shader(hit, 0,0):
             fragment_shader(hit);
     }
 
@@ -392,7 +392,7 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
 }
 
 // Raytracing shader: create new rays for computing refraction and reflection
-Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
+Fragment PolyRenderer::reflection_refraction_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
     Tri& tri = tris[hit.tri];
     Material& mat = mats[tri.mat];
     uint16_t flags = (tri.flags | debug);
@@ -407,7 +407,7 @@ Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t
         rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
         rray = Ray(hit.point, rdir); rray.medium = tri.mat;
         return (intersection_shader(rray, rhit)) ? 
-            frag * (1.0f - mat.reflective) + raytracing_shader(rhit, N_REFLECTION+1, N_REFRACTION) * mat.reflective :
+            frag * (1.0f - mat.reflective) + reflection_refraction_shader(rhit, N_REFLECTION+1, N_REFRACTION) * mat.reflective :
             frag;
     }
 
@@ -419,19 +419,20 @@ Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t
         float cosTheta1 = Vec3::dot(hit.ray.dir, hit.phong) * -1.0f, theta1 = acosf(cosTheta1);
         float sinTheta2 = (old.refractive / mat.refractive) * sinf(theta1), theta2 = asinf(sinTheta2);
 
-        Fragment color = Fragment(mat.color);
+        //Fragment color = Fragment(mat.color);
+        Fragment color = (mat.texture) ? texture_mapping(hit) : Fragment(mat.color);
 
-        if(sinTheta2>=1.0f){ // Internal reflection
+        if(sinTheta2>=1.0f && N_REFLECTION<MAX_RAY_BOUNCES){ // Internal reflection
             rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
             rray = Ray(hit.point, rdir); rray.medium = tri.mat;
             return (intersection_shader(rray, rhit)) ?
-                raytracing_shader(rhit, N_REFLECTION+1, N_REFRACTION) * color * Vec3(0.5f) :
+                reflection_refraction_shader(rhit, N_REFLECTION+1, N_REFRACTION) * color * Vec3(0.5f) :
                 color;
         } else {
             rdir = (hit.ray.dir + hit.phong * cosTheta1) * (old.refractive / mat.refractive) - hit.phong * cosTheta1;
             rray = Ray(hit.point, rdir); rray.medium = tris[hit.tri].mat;
             return (intersection_shader(rray, rhit)) ? 
-                raytracing_shader(rhit, N_REFLECTION, N_REFRACTION+1) * color * Vec3(0.99f) :
+                reflection_refraction_shader(rhit, N_REFLECTION, N_REFRACTION+1) * color * Vec3(0.99f) :
                 color; 
         }
     }
