@@ -1,5 +1,11 @@
 # duck demo
 
+debug:
+  
+
+debug:
+  - DISABLE_BUMP
+
 camera:
   position: [0.0, 0.15, 0.0]
   fov: 30.0
@@ -7,11 +13,13 @@ camera:
 materials: 
   
   - name: "duck_mat"
-    texture: "textures/duck.png"
+    #texture: "textures/duck.png"
+    color: [255,255,255]
     bump: "textures/duck_bump.png"
     diffuse: 2.0
     specular: 32.0
-    refractive: 1.333
+    reflective: 1.0
+    
   - name: "sky_mat"
     texture: "textures/sky3.png"
     diffuse: 2.0

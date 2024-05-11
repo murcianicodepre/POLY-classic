@@ -6,19 +6,15 @@ camera:
 
 materials:
   - name: "sky_mat"
-    texture: "textures/sky2.png"
+    texture: "textures/sky3.png"
     diffuse: 0.0
     specular: 0.0
-  - name: "cube_mat"
-    texture: "textures/demo_texture.png"
-    diffuse: 2.0
-    specular: 16.0
-
   - name: "mat1"
-    texture: "textures/cobblestone.png"
-    bump: "textures/cobblestone_bump.png"
+    texture: "textures/demo_texture.png"
+    bump: "textures/bump.png"
     diffuse: 2.0
     specular: 32.0
+
 
 objects:
   - name: "sky"
@@ -30,37 +26,15 @@ objects:
       scale: 5.0
       move: [0.0, 0.0, 3.0]
 
-  - name: "cube"
+  - name: "obj"
     file: "models/cube.ply"
-    material: "cube_mat"
-    flags:
-    transforms:
-      scale: 0.2
-      rotate: [-20.0, 45.0, 0.0]
-      move: [0.0, 0.06, 1.5]
-
-  - name: "floor"
-    file: "models/quad2.ply"
     material: "mat1"
     transforms:
-      scale: 2.0
-      rotate: [90.0, 0.0, 0.0]
-      move: [0.0, -0.3, 1.5]
-  
-  - name: "roof"
-    file: "models/quad2.ply"
-    material: "mat1"
-    transforms:
-      scale: 2.0
-      rotate: [-90.0, 0.0, 0.0]
-      move: [0.0, 0.6, 1.5]
+      scale: 0.5
+      move: [0.0, -0.5, 2.0]
 
 lights:
   - type: directional
-    direction: [0.0, 1.0, -1.0]
+    direction: [0.5, 0.5, -1.0]
     color: [255,255,255]
-    intensity: 0.0
-  - type: point
-    position: [0.5, 0.3, -1.0]
-    color: [255,255,255]
-    intensity: 0.8
+    intensity: 0.7

@@ -39,22 +39,19 @@ public:
     - Texture coordinates of the hit
 */
 struct Hit{
-    uint32_t tri = 0u;
+    uint32_t triId = 0u;
     Vec3 point, normal, phong;
-    float u = 0.0f, v = 0.0f;
+    float u = 0.0f, v = 0.0f, t;
     Ray ray;
     bool valid = false;
-    float t;
 };
 
 // Tri class
 class Tri {
 public:
     Vertex a, b, c;
-    uint16_t mat, poly;
-    Vec3 centroid;
-    uint8_t flags;
-    Tri(Vertex a, Vertex b, Vertex c, uint16_t poly, uint16_t mat, uint8_t flags);
+    uint8_t flags, matId;
+    Tri(Vertex a, Vertex b, Vertex c, uint8_t matId, uint8_t flags);
     bool intersect(Ray ray, Hit& hit);
     void move(Vec3 m);
     void scale(float s);
@@ -65,13 +62,14 @@ public:
     void rotateZ(float r);
     float min(uint8_t axis);
     float max(uint8_t axis);
+    Vec3 centroid();
 };
 
 // Poly class
 class Poly {
 public:
     std::vector<Tri> tris;
-    Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags);
+    Poly(const char* path, uint8_t mat, uint8_t flags);
     void move(Vec3 m);
     void scale(Vec3 s);
     void scale(float s);

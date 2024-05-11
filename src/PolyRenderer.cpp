@@ -37,11 +37,8 @@ bool BVHNode::intersectAABB(Ray& ray){
 void PolyRenderer::buildBVH(){
     bvh = (BVHNode*) malloc(sizeof(BVHNode) * 2 * tris.size() - 1);
     triIdx = (uint32_t*) malloc(sizeof(uint32_t) * tris.size());
-    for(uint32_t i=0; i<tris.size(); i++){
-        Tri& tri = tris[i];
+    for(uint32_t i=0; i<tris.size(); i++) 
         triIdx[i] = i;
-        tri.centroid = (tri.a.xyz + tri.b.xyz + tri.c.xyz) * 0.33333f;
-    }
 
     // Assign all tris to root node
     BVHNode& root = bvh[0];
@@ -84,7 +81,7 @@ void PolyRenderer::subdivide(uint32_t nodeId){
     uint32_t i = node.leftFirst, j = i + node.n - 1;
     while(i<=j){
         Tri& tri = tris[triIdx[i]];
-        if(tri.centroid[axis]<split) i++;
+        if(tri.centroid()[axis]<split) i++;
         else std::swap(triIdx[i], triIdx[j--]);
     }
 
@@ -117,7 +114,7 @@ void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t di
 
             // Tri intersection test
             if(tri.intersect(ray, aux) && fabs(aux.point.z - ray.ori.z) < minDist){
-                hit = aux; hit.valid = true; hit.tri = triIdx[node.leftFirst+i];
+                hit = aux; hit.valid = true; hit.triId = triIdx[node.leftFirst+i];
                 minDist = fabs(aux.point.z - ray.ori.z);
             }
         }
@@ -257,7 +254,7 @@ bool PolyRenderer::loadScene(const char* path){
                     if(obj["flags"])
                         obj_flags = static_cast<uint8_t>(parseFlags(obj["flags"]));
 
-                    Poly poly = Poly(obj_file.c_str(), static_cast<uint16_t>(polys.size()), static_cast<uint16_t>(distance(mats_names.begin(), it)), (obj_flags|(debug & 0xffu)));
+                    Poly poly = Poly(obj_file.c_str(), static_cast<uint8_t>(distance(mats_names.begin(), it)), (obj_flags|(debug & 0xffu)));
                     if(obj["transforms"])
                         for(const auto& t : obj["transforms"]){
                             string op = t.first.as<string>();
@@ -338,7 +335,8 @@ bool PolyRenderer::render(uint8_t threads, bool ENABLE_RENDERING_WINDOW){
         buildBVH();
 
     // Start timer and launch rendering threads
-    printf("\e[1;93m rendering \e[95m%d×%d \e[93min %s × %d\e[0m\n", WIDTH, HEIGHT, PolyRenderer::getCpu(), threads);
+    printf("\e[1;93m rendering \e[95m%d×%d \e[93min %s × %d ", WIDTH, HEIGHT, PolyRenderer::getCpu(), threads);
+    fflush(stdout);
     tini = static_cast<float>(omp_get_wtime());
 
     #pragma omp parallel for collapse(2) shared(frame, tris, mats, lights) num_threads(threads) schedule(dynamic)
@@ -365,7 +363,8 @@ bool PolyRenderer::render(uint8_t threads, bool ENABLE_RENDERING_WINDOW){
         
     // Compute elapsed time
     trender = static_cast<float>(omp_get_wtime()) - tini;
-    printf("\e[1;96m %u \e[93mtris in \e[95m%.3lfs \e[92mOK\e[m\n", static_cast<uint>(tris.size()), trender);
+    //printf("\e[1;96m %u \e[93mtris in \e[95m%.3lfs \e[92mOK\e[m\n", static_cast<uint>(tris.size()), trender);
+    printf("\e[1;95m%.3f \e[92mOK\e[0m\n", trender);
     
     return true;
 }
@@ -378,84 +377,83 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
     
     // Intersection step
     if(intersection_shader(ray, hit)){
-        Tri& tri = tris[hit.tri];
-        Material& mat = mats[tri.mat];
+        Tri& tri = tris[hit.triId];
+        Material& mat = mats[tri.matId], & oldMat = mats[hit.ray.medium];
         uint16_t flags = (tri.flags | debug);
 
         out = (!((flags>>8u) & FLAT_SHADING) && 
             ((mat.reflective>0.0f && !(flags & DISABLE_REFLECTIONS)) || (mat.refractive!=1.0f && !(flags & DISABLE_REFRACTIONS)))) ? 
-            reflection_refraction_shader(hit, 0,0):
+            raytracing_shader(hit, 0, 0):
             fragment_shader(hit);
     }
 
     return RGBA(out);
 }
 
-// Raytracing shader: create new rays for computing refraction and reflection
-Fragment PolyRenderer::reflection_refraction_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
-    Tri& tri = tris[hit.tri];
-    Material& mat = mats[tri.mat];
-    uint16_t flags = (tri.flags | debug);
+Fragment PolyRenderer::reflection_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
+    Tri& tri = tris[hit.triId];
+    Material& mat = mats[tri.matId];
 
-    Fragment frag = fragment_shader(hit);
-    Vec3 rdir;
-    Ray rray;
+    Vec3 rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
+    Ray rray = Ray(hit.point, rdir); rray.medium = tri.matId;
     Hit rhit;
 
-    // Reflection step
-    if(!(flags & (DISABLE_REFLECTIONS | DISABLE_SHADING)) && mat.reflective>0.0f && N_REFLECTION<MAX_RAY_BOUNCES){
-        rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
-        rray = Ray(hit.point, rdir); rray.medium = tri.mat;
-        return (intersection_shader(rray, rhit)) ? 
-            frag * (1.0f - mat.reflective) + reflection_refraction_shader(rhit, N_REFLECTION+1, N_REFRACTION) * mat.reflective :
-            frag;
+    return (intersection_shader(rray, rhit)) ? raytracing_shader(rhit, N_REFLECTION, N_REFRACTION) : fragment_shader(hit);
+}
+
+Fragment PolyRenderer::refraction_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
+    Tri& tri = tris[hit.triId];
+    Material& newMat = mats[tri.matId], & oldMat = mats[hit.ray.medium];
+
+    float cosTheta1 = Vec3::dot(hit.ray.dir, hit.phong) * -1.0f, theta1 = acosf(cosTheta1);
+    float sinTheta2 = (oldMat.refractive / newMat.refractive) * sinf(theta1), theta2 = asinf(sinTheta2);
+
+    if(sinTheta2>=1.0f){
+        return reflection_shader(hit, N_REFLECTION, N_REFRACTION);
+    } else {
+        Vec3 rdir = (hit.ray.dir + hit.phong * cosTheta1) * (oldMat.refractive / newMat.refractive) - hit.phong * cosTheta1;
+        Ray rray = Ray(hit.point, rdir); rray.medium = tris[hit.triId].matId;
+        Hit rhit;
+
+        return (intersection_shader(rray, rhit)) ? raytracing_shader(rhit, N_REFLECTION, N_REFRACTION) : fragment_shader(hit);
     }
+}
 
-    // Refraction step
-    if(!(flags & (DISABLE_REFRACTIONS | DISABLE_SHADING)) && mat.refractive!=1.0f && N_REFRACTION<MAX_RAY_BOUNCES){
-        Material& old = mats[hit.ray.medium];
+// Raytracing shader: computes reflection and refraction for a given hit
+Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
+    Tri& tri = tris[hit.triId];
+    Material& mat = mats[tri.matId];
+    uint16_t flags = (tri.flags | debug);
 
-        // Snell's law
-        float cosTheta1 = Vec3::dot(hit.ray.dir, hit.phong) * -1.0f, theta1 = acosf(cosTheta1);
-        float sinTheta2 = (old.refractive / mat.refractive) * sinf(theta1), theta2 = asinf(sinTheta2);
+    // First compute color from fragment_shader or from refraction_shader
+    Fragment frag = (!(flags & DISABLE_REFRACTIONS) && (mat.refractive!=1.0f) && (N_REFRACTION<MAX_RAY_BOUNCES)) ? 
+        refraction_shader(hit, N_REFLECTION, N_REFRACTION+1) * fragment_shader(hit, DISABLE_SHADING) * Vec3(0.99f) : 
+        fragment_shader(hit);
 
-        //Fragment color = Fragment(mat.color);
-        Fragment color = (mat.texture) ? texture_mapping(hit) : Fragment(mat.color);
+    // Then compute reflection
+    Fragment reflection = (!(flags & DISABLE_REFRACTIONS) && (mat.reflective>0.0f) && (N_REFLECTION<MAX_RAY_BOUNCES)) ?
+        reflection_shader(hit, N_REFLECTION+1, N_REFRACTION) :
+        fragment_shader(hit);
 
-        if(sinTheta2>=1.0f && N_REFLECTION<MAX_RAY_BOUNCES){ // Internal reflection
-            rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
-            rray = Ray(hit.point, rdir); rray.medium = tri.mat;
-            return (intersection_shader(rray, rhit)) ?
-                reflection_refraction_shader(rhit, N_REFLECTION+1, N_REFRACTION) * color * Vec3(0.5f) :
-                color;
-        } else {
-            rdir = (hit.ray.dir + hit.phong * cosTheta1) * (old.refractive / mat.refractive) - hit.phong * cosTheta1;
-            rray = Ray(hit.point, rdir); rray.medium = tris[hit.tri].mat;
-            return (intersection_shader(rray, rhit)) ? 
-                reflection_refraction_shader(rhit, N_REFLECTION, N_REFRACTION+1) * color * Vec3(0.99f) :
-                color; 
-        }
-    }
-
-    return frag;
+    // Compute final color
+    return (frag * (1.0f - mat.reflective)) + (reflection * mat.reflective);
 }
 
 // Intersection shader: compute closest tri hit
 bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint16_t discard){
 
-    // TODO: fix slow intersection shader
     if ((debug>>8) & DISABLE_FAST_INTERSECTION_SHADER){
         float minDist = fabs(1000.0f - ray.ori.z);
         Hit aux;
         for(uint32_t i=0; i<tris.size(); i++){
             Tri& tri = tris[i];
 
-            // Discard if tri.flags matches with low byte of flags
+            // Discard if tri.flags matches with low byte of discard flag
             if(tri.flags & static_cast<uint8_t>(discard & 0xffu)) continue;
 
             // Intersection test
             if(tri.intersect(ray, aux) && fabs(aux.point.z - ray.ori.z) < minDist){
-                hit = aux; hit.tri = i; hit.valid = true; hit.ray = ray;
+                hit = aux; hit.triId = i; hit.valid = true; hit.ray = ray;
                 minDist = fabs(aux.point.z - ray.ori.z);
             }
         }
@@ -467,31 +465,31 @@ bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint16_t discard){
     }
 }
 
-Fragment PolyRenderer::fragment_shader(Hit& hit){
-    Tri& tri = tris[hit.tri];
-    Material& mat = mats[tri.mat];
+Fragment PolyRenderer::fragment_shader(Hit& hit, uint8_t flags){
+    Tri& tri = tris[hit.triId];
+    Material& mat = mats[tri.matId];
     Ray& ray = hit.ray;
     Fragment out;
-    uint16_t flags = (tri.flags | debug);
+    uint16_t flags16 = (tri.flags | debug | flags);
     Vec3 rdir;
     Hit hit2;
 
     // TEXTURE MAPPING STEP: compute texture
-    Fragment tex = (!(flags & DISABLE_TEXTURES) && !((flags>>8) & FLAT_SHADING) && tri.mat<mats.size()) ? 
+    Fragment tex = (!(flags16 & DISABLE_TEXTURES) && !((flags16>>8) & FLAT_SHADING) && tri.matId<mats.size()) ? 
         texture_mapping(hit) : Fragment(0.8f, 0.8f, 0.8f, 1.0f);
 
     // BUMP MAPPING STEP: compute bump mapping
-    hit.phong = (!(flags & DISABLE_BUMP) && !((flags>>8) & FLAT_SHADING) && tri.mat<mats.size()) ? bump_mapping(hit) : hit.phong;
+    hit.phong = (!(flags16 & DISABLE_BUMP) && !((flags16>>8) & FLAT_SHADING) && tri.matId<mats.size()) ? bump_mapping(hit) : hit.phong;
 
     // SHADING STEP: compute shading for this hit
-    Fragment shading = ((flags >> 8) & FLAT_SHADING) ? flat_shading(hit) : blinn_phong_shading(hit);
+    Fragment shading = ((flags16 >> 8) & FLAT_SHADING) ? flat_shading(hit) : blinn_phong_shading(hit, flags);
 
     // Compute fragment color
     out = shading * tex;
 
     // ALPHA BLENDING STEP
-    if(!(flags & DISABLE_TRANSPARENCY) && tri.mat<mats.size() && tex.a<1.0f){
-        Ray rray = Ray(hit.point, ray.dir); rray.medium = tri.mat;
+    if(!(flags16 & DISABLE_TRANSPARENCY) && tri.matId<mats.size() && tex.a<1.0f){
+        Ray rray = Ray(hit.point, ray.dir); rray.medium = tri.matId;
         if(intersection_shader(rray, hit2)) 
             return (out * tex.a) + fragment_shader(hit2);
     }
@@ -500,13 +498,13 @@ Fragment PolyRenderer::fragment_shader(Hit& hit){
 }
 
 // Blinn-Phong shader: compute blinn-phong shading for given hit
-Fragment PolyRenderer::blinn_phong_shading(Hit& hit){
-    Tri& tri = tris[hit.tri];
-    Material& mat = mats[tri.mat];
-    uint16_t flags = (tri.flags | debug);
+Fragment PolyRenderer::blinn_phong_shading(Hit& hit, uint8_t flags){
+    Tri& tri = tris[hit.triId];
+    Material& mat = mats[tri.matId];
+    uint16_t flags16 = (tri.flags | debug | flags);
 
     Vec3 blinn_phong;
-    if(!(flags & DISABLE_SHADING)){
+    if(!(flags16 & DISABLE_SHADING)){
         Vec3 view = (cam->ori - hit.point).normalize();
 
         for(auto& l : lights){
@@ -530,7 +528,7 @@ Fragment PolyRenderer::blinn_phong_shading(Hit& hit){
             } else { blinn_phong = blinn_phong + l.get()->color.toVec3() * l.get()->intensity; continue; }
 
             // SHADOW MAPPING STEP: check if there's geometry between the fragment and the light source
-            if(!(flags & DISABLE_SHADOWS)){
+            if(!(flags16 & DISABLE_SHADOWS)){
                 Vec3 sori = Vec3::dot(ldir, hit.normal) < 0.0f ? hit.point + hit.normal*EPSILON : hit.point + hit.normal*EPSILON;
                 Ray lray = Ray(sori, ldir);
                 Hit hit2;
@@ -561,7 +559,7 @@ Fragment PolyRenderer::flat_shading(Hit& hit){
 
 // Texture shader: compute texel from tri texture and hit UV coordinates
 Fragment PolyRenderer::texture_mapping(Hit& hit){
-    Material& mat = mats[tris[hit.tri].mat];
+    Material& mat = mats[tris[hit.triId].matId];
     if(mat.texture){
         uint16_t tx = hit.u * (TEXTURE_SIZE - 1); tx %= (TEXTURE_SIZE-1);
         uint16_t ty = hit.v * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
@@ -571,20 +569,21 @@ Fragment PolyRenderer::texture_mapping(Hit& hit){
 
 // Bump shader: compute surface normal from tri normal map and hit UV coordinates
 Vec3 PolyRenderer::bump_mapping(Hit& hit){
-    Material& mat = mats[tris[hit.tri].mat];
+    Material& mat = mats[tris[hit.triId].matId];
     if(mat.bump){
         // Convert to tangent coordinates and compute normal vector using bump texture https://learnopengl.com/Advanced-Lighting/Normal-Mapping
         uint16_t tx = hit.u * (TEXTURE_SIZE - 1); tx %= (TEXTURE_SIZE-1);
         uint16_t ty = hit.v * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
 
         // Compute tangent and bitangent
-        Tri& tri = tris[hit.tri];
+        Tri& tri = tris[hit.triId];
         Vec3 e1 = tri.b.xyz - tri.a.xyz, e2 = tri.c.xyz - tri.a.xyz;
         float du1 = tri.b.u - tri.a.u, dv1 = tri.b.v - tri.a.v;
         float du2 = tri.c.u - tri.a.u, dv2 = tri.c.v - tri.a.v;
         float f = 1.0f / (du1 * dv2 - du2 * dv1);
 
         Vec3 tangent = Vec3(f * (dv2 * e1.x - dv1 * e2.x), f * (dv2 * e1.y - dv1 * e2.y), f * (dv2 * e1.z - dv1 * e2.z)).normalize();
+        // TODO: due to blender fix, (0,0) texture coordinate is left-down, not left-up
         Vec3 bitangent = Vec3(f * (du2 * e1.x - du1 * e2.x), f * (du2 * e1.y - du1 * e2.y), f * (du2 * e1.z - du1 * e2.z)).normalize();
 
         Vec3 bumpMap = mat.bump[tx + ty*TEXTURE_SIZE].toVec3()* 2.0f - 1.0f;
@@ -596,7 +595,7 @@ Vec3 PolyRenderer::bump_mapping(Hit& hit){
 // Save scene into .png file
 void PolyRenderer::save(const char* path){
     savePNG(path, frame);
-    printf("\e[1;93m render saved in '\e[95m%s\e[93m'\e[0m\n", path);
+    printf("\e[1;93m saved in '\e[95m%s\e[93m'\e[0m\n", path);
 }
 
 // Get Cpu code

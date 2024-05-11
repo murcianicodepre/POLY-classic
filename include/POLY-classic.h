@@ -61,12 +61,4 @@ class Vertex;
 class Material;
 struct Hit;
 
-// Shared classes
-static const char* getCpu();
-static void printIntro();
-static void polyMsg(std::string msg);
-Vec3 parseVec3(YAML::Node node);
-RGBA parseColor(YAML::Node node);
-uint8_t parseFlag(YAML::Node node);
-
 #endif

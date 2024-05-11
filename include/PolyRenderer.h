@@ -45,12 +45,14 @@ public:
     // Rendering pipeline functions
     RGBA compute_pixel(uint16_t, uint16_t);
     bool intersection_shader(Ray&, Hit&, uint16_t discard = 0x0000u);
-    Fragment blinn_phong_shading(Hit&);
+    Fragment blinn_phong_shading(Hit&, uint8_t flags = 0x00u);
     Fragment flat_shading(Hit&);
-    Fragment fragment_shader(Hit&);
+    Fragment fragment_shader(Hit&, uint8_t flags = 0x00u);
     Fragment texture_mapping(Hit&);
     Vec3 bump_mapping(Hit&);
-    Fragment reflection_refraction_shader(Hit&, uint8_t, uint8_t);
+    Fragment raytracing_shader(Hit&, uint8_t, uint8_t);
+    Fragment reflection_shader(Hit&, uint8_t, uint8_t);
+    Fragment refraction_shader(Hit&, uint8_t, uint8_t);
 
     // Other renderer functions
     static RGBA* loadPNG(const char* path);

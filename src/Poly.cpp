@@ -14,7 +14,7 @@ void Vertex::rotateX(float r){ xyz.rotateX(r); normal.rotateX(r); }
 void Vertex::rotateY(float r){ xyz.rotateY(r); normal.rotateY(r); }
 void Vertex::rotateZ(float r){ xyz.rotateZ(r); normal.rotateZ(r); }
 
-Tri::Tri(Vertex a, Vertex b, Vertex c, uint16_t poly, uint16_t mat, uint8_t flags) : a(a), b(b), c(c), poly(poly), mat(mat), flags(flags) {}
+Tri::Tri(Vertex a, Vertex b, Vertex c, uint8_t matId, uint8_t flags) : a(a), b(b), c(c), matId(matId), flags(flags) {}
 bool Tri::intersect(Ray ray, Hit& hit){
     Vec3 edge1 = b.xyz - a.xyz, edge2 = c.xyz - a.xyz, h = Vec3::cross(ray.dir, edge2);
 
@@ -56,8 +56,9 @@ void Tri::rotateY(float r){ a.rotateY(r); b.rotateY(r); c.rotateY(r); }
 void Tri::rotateZ(float r){ a.rotateZ(r); b.rotateZ(r); c.rotateZ(r); }
 float Tri::min(uint8_t axis){ float m = a.xyz[axis]<b.xyz[axis] ? a.xyz[axis] : b.xyz[axis]; return m<c.xyz[axis] ? m : c.xyz[axis]; }
 float Tri::max(uint8_t axis){ float m = a.xyz[axis]>=b.xyz[axis] ? a.xyz[axis] : b.xyz[axis]; return m>=c.xyz[axis] ? m : c.xyz[axis]; }
+Vec3 Tri::centroid(){  return (a.xyz + b.xyz + c.xyz) * 0.33333f; }
 
-Poly::Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags){
+Poly::Poly(const char* path, uint8_t matId, uint8_t flags){
     if(flags & DISABLE_RENDERING) return;
     char buff[128u];
     float x, y, z, nx, ny, nz, u, v;
@@ -112,7 +113,7 @@ Poly::Poly(const char* path, uint16_t polyId, uint16_t mat, uint8_t flags){
             iss >> element; b = vertices[stoi(element)];
             iss >> element; c = vertices[stoi(element)];
 
-            Tri tri = Tri(a, b, c, polyId, mat, flags);
+            Tri tri = Tri(a, b, c, matId, flags);
             tris.push_back(tri);
         }
     }

@@ -1,5 +1,6 @@
 # klein.poly ~ refraction test
 
+
 camera:
   position: [0.2, 0.5, -0.5]
   fov: 35.0
@@ -51,14 +52,12 @@ objects:
     material: "mat1"
     transforms:
       scale: 0.25
-      rotate: [0.0, 20.0, 0.0]
+      #rotate: [0.0, 20.0, 0.0]
       move: [0.0, -0.09, 1.1]
 
   - name: "klein2"
     file: "models/klein.ply"
     material: "mat2"
-    flags:
-      
     transforms:
       scale: 0.18
       move: [-0.25, -0.09, 0.8]
@@ -66,8 +65,6 @@ objects:
   - name: "klein3"
     file: "models/klein.ply"
     material: "mat3"
-    flags:
-      
     transforms:
       scale: 0.20
       rotate: [0.0, -190.0, 0.0]
