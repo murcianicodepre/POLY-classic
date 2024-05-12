@@ -32,7 +32,7 @@ materials:
     diffuse: 2.0
     specular: 32.0
     reflective: 0.5
-    refractive: 1.33
+
   - name: "mirror2"
     color: [255,255,255]
     diffuse: 2.0
@@ -141,8 +141,6 @@ objects:
   - name: "ball"
     file: "models/sphere.ply"
     material: "mirror2"
-    flags:
-      #- DISABLE_SHADOWS
     transforms:
       scale: 0.2
       move: [0.3, 0.3, 2.0]

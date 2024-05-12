@@ -23,12 +23,12 @@ class PolyRenderer{
 public:
     PolyRenderer();
     ~PolyRenderer();
-    RGBA* frame;
-    Camera* cam;
-    std::vector<Tri> tris;
-    std::vector<Material> mats;
-    std::vector<std::unique_ptr<Light>> lights;
-    BVHNode* bvh;
+    RGBA* _frame;
+    Camera* _cam;
+    std::vector<Tri> _tris;
+    std::vector<Material> _mats;
+    std::vector<std::unique_ptr<Light>> _lights;
+    BVHNode* _bvh;
 
     // Main program functions
     bool loadScene(const char* scene);
@@ -36,7 +36,7 @@ public:
     void save(const char* path);
 
     // Acceleration struct
-    uint32_t nextNode = 1, * triIdx = nullptr;
+    uint32_t _nextNode = 1, * _triIdx = nullptr;
     void buildBVH();
     void updateNodeBounds(uint32_t nodeId);
     void subdivide(uint32_t nodeId);
@@ -65,7 +65,7 @@ public:
     static uint16_t parseFlags(YAML::Node node);
 
     // Debug flags
-    uint16_t debug = 0x0000u;
+    uint16_t _global = 0x0000u;
 }; 
 
 

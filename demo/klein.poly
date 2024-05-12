@@ -1,6 +1,5 @@
 # klein.poly ~ refraction test
 
-
 camera:
   position: [0.2, 0.5, -0.5]
   fov: 35.0
@@ -52,7 +51,7 @@ objects:
     material: "mat1"
     transforms:
       scale: 0.25
-      #rotate: [0.0, 20.0, 0.0]
+      rotate: [0.0, 20.0, 0.0]
       move: [0.0, -0.09, 1.1]
 
   - name: "klein2"

@@ -45,4 +45,4 @@ lights:
 ![demo](/cornell.png "render demo")
 
 ## How to get <code>.ply</code> 3D models
-Using Blender, import any 3D model and then **File > Export > Standford PLY(.ply)**. In the window, select "ASCII", "UV Coordinates", "Vertex Normals" and "Triangulated Mesh" and set "Forward Axis" to "Z" and "Up Axis" to "Y"
+Using Blender, import any 3D model and then **File > Export > Standford PLY(.ply)**. In the window, select "ASCII", "UV Coordinates", "Vertex Normals" and "Triangulated Mesh" and set "Forward Axis" to "Z" and "Up Axis" to "Y". Remenber that all 3D models will be flipped on the x-axis
