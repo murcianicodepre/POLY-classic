@@ -40,10 +40,10 @@ public:
 */
 struct Hit{
     uint32_t triId = 0u;
-    Vec3 point, normal, phong;
-    float u = 0.0f, v = 0.0f, t;
+    Vec3 normal, phong;
+    float u = 0.0f, v = 0.0f, t = __FLT_MAX__;
     Ray ray;
-    bool valid = false;
+    Vec3 point(){ return ray.point(t); }
 };
 
 // Tri class

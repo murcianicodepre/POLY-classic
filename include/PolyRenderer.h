@@ -28,7 +28,7 @@ public:
     std::vector<Tri> _tris;
     std::vector<Material> _mats;
     std::vector<std::unique_ptr<Light>> _lights;
-    BVHNode* _bvh;
+    BVHNode* _bvh = nullptr;
 
     // Main program functions
     bool loadScene(const char* scene);
@@ -44,7 +44,7 @@ public:
 
     // Rendering pipeline functions
     RGBA compute_pixel(uint16_t, uint16_t);
-    bool intersection_shader(Ray&, Hit&, uint16_t discard = 0x0000u);
+    bool intersection_shader(Ray&, Hit&, uint8_t discard = 0x00u);
     Fragment blinn_phong_shading(Hit&, uint8_t flags = 0x00u);
     Fragment flat_shading(Hit&);
     Fragment fragment_shader(Hit&, uint8_t flags = 0x00u);
@@ -65,9 +65,7 @@ public:
     static uint16_t parseFlags(YAML::Node node);
 
     // Debug flags
-    uint16_t _global = 0x0000u;
+    uint16_t _global = 0x00000000u;
 }; 
-
-
 
 #endif 

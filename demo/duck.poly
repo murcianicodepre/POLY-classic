@@ -44,6 +44,8 @@ objects:
   - name: "cube"
     file: "models/cube.ply"
     material: mat
+    flags:
+      - DISABLE_RENDERING
     transforms:
       scale: 0.37
       rotate: [0.0, 30.0, 0.0]

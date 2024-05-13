@@ -34,7 +34,6 @@ bool Tri::intersect(Ray ray, Hit& hit){
     if(t>EPSILON && Vec3::dot(ray.dir, normal)<0.0f){  // Hit!
 
         hit.t = t;
-        hit.point = ray.point(t);
         hit.normal = normal;
 
         hit.ray = ray;
