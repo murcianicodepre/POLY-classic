@@ -41,6 +41,9 @@ public:
     void updateNodeBounds(uint32_t nodeId);
     void subdivide(uint32_t nodeId);
     void intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t discard = 0x0000u);
+    float EvaluateSAH(BVHNode&, uint8_t, float);
+    float getBestSplit(BVHNode&, uint8_t&, float&);
+    float getNodeCost(BVHNode&);
 
     // Rendering pipeline functions
     RGBA compute_pixel(uint16_t, uint16_t);
@@ -62,7 +65,7 @@ public:
     static void polyMsg(std::string msg);
     static Vec3 parseVec3(YAML::Node node);
     static RGBA parseColor(YAML::Node node);
-    static uint16_t parseFlags(YAML::Node node);
+    static uint16_t parseFlags(YAML::Node node, bool print = false);
 
     // Debug flags
     uint16_t _global = 0x00000000u;

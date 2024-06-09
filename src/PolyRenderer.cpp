@@ -29,6 +29,7 @@ bool BVHNode::intersectAABB(Ray& ray){
 }
 
 void PolyRenderer::buildBVH(){
+    printf("\e[1;93m compiling bvh: \e[95m"); fflush(stdout);
     _bvh = (BVHNode*) malloc(sizeof(BVHNode) * 2 * _tris.size() - 1);
     _triIdx = (uint32_t*) malloc(sizeof(uint32_t) * _tris.size());
     for(uint32_t i=0; i<_tris.size(); i++) 
@@ -38,11 +39,16 @@ void PolyRenderer::buildBVH(){
     BVHNode& root = _bvh[0];
     root.n = _tris.size(); root.leftFirst = 0u;
 
+    // Register building time
+    float tini = static_cast<float>(omp_get_wtime()), tbuild;
+
     updateNodeBounds(0);    // Update bounds of root node
     subdivide(0);           // Start subdivision
 
-    // Print size of _bvh structure
-    PolyRenderer::polyMsg("\e[1;93m compiling bvh: \e[95m" + to_string(_nextNode) + " \e[93mnodes (\e[95m" + to_string(_nextNode*sizeof(BVHNode)) + " bytes\e[93m) \e[92mOK\e[0m\n");
+    tbuild = static_cast<float>(omp_get_wtime()) - tini;
+
+    // Print size and building time
+    printf("%s \e[93mnodes (\e[95m%s bytes\e[93m) \e[95m%.3fs \e[92mOK\e[0m\n", to_string(_nextNode).c_str(), to_string(_nextNode*sizeof(BVHNode)).c_str(), tbuild);
 }
 
 void PolyRenderer::updateNodeBounds(uint32_t nodeId){
@@ -59,20 +65,77 @@ void PolyRenderer::updateNodeBounds(uint32_t nodeId){
     }
 }
 
+float PolyRenderer::EvaluateSAH(BVHNode& node, uint8_t axis, float pos){
+    Vec3 leftAABBMin, leftAABBMax, rightAABBMin, rightAABBMax;
+    uint32_t leftCount = 0u, rightCount = 0u;
+    for(uint32_t i=node.leftFirst; i<node.leftFirst+node.n; i++){
+        Tri& tri = _tris[_triIdx[i]];
+        if(tri.centroid()[axis] < pos){
+            leftCount++;
+            leftAABBMin = Vec3::minVec3(leftAABBMin, tri.a.xyz); leftAABBMax = Vec3::maxVec3(leftAABBMin, tri.a.xyz);
+            leftAABBMin = Vec3::minVec3(leftAABBMin, tri.b.xyz); leftAABBMax = Vec3::maxVec3(leftAABBMin, tri.b.xyz);
+            leftAABBMin = Vec3::minVec3(leftAABBMin, tri.c.xyz); leftAABBMax = Vec3::maxVec3(leftAABBMin, tri.c.xyz);
+        } else {
+            rightCount++;
+            rightAABBMin = Vec3::minVec3(rightAABBMin, tri.a.xyz); rightAABBMax = Vec3::maxVec3(rightAABBMin, tri.a.xyz);
+            rightAABBMin = Vec3::minVec3(rightAABBMin, tri.b.xyz); rightAABBMax = Vec3::maxVec3(rightAABBMin, tri.b.xyz);
+            rightAABBMin = Vec3::minVec3(rightAABBMin, tri.c.xyz); rightAABBMax = Vec3::maxVec3(rightAABBMin, tri.c.xyz);
+        }
+    }
+    Vec3 e = leftAABBMax-leftAABBMin;
+    float leftArea = e.x*e.y + e.y*e.z + e.z*e.x;
+    float cost = leftCount*leftArea;
+
+    e = rightAABBMax-rightAABBMin;
+    float rightArea = e.x*e.y + e.y*e.z + e.z*e.x;
+    cost += rightCount*rightArea;
+
+    return (cost > 0.0f) ? cost : __FLT_MAX__;
+}
+
+float PolyRenderer::getBestSplit(BVHNode& node, uint8_t& axis, float& split){
+    float bestCost = __FLT_MAX__;
+    for(uint8_t a = 0; a<3; a++){
+        float minBounds = node.aabbMin[a], maxBounds = node.aabbMax[a];
+        if(minBounds==maxBounds) continue;
+        float s = (maxBounds-minBounds) / SPLIT_PLANES;
+        for(uint8_t i=0; i<SPLIT_PLANES; i++){
+            float candidatePos = minBounds + i*s;
+            float cost = EvaluateSAH(node, a, candidatePos);
+            if(cost<bestCost){
+                split = candidatePos, axis = a, bestCost = cost;
+            }
+        }
+    }
+    return bestCost;
+}
+float PolyRenderer::getNodeCost(BVHNode& node){
+    Vec3 e = node.aabbMax - node.aabbMin;
+    float area = e.x*e.y + e.y*e.z + e.z*e.x;
+    return node.n * area;
+}
+
 void PolyRenderer::subdivide(uint32_t nodeId){
     BVHNode& node = _bvh[nodeId];
     if(node.n<=2) return;  // Terminate recursive subdivision
 
-    // Get split axis
-    Vec3 ext = node.aabbMax - node.aabbMin;
-    uint8_t axis = 0u;
-    if(ext.y > ext.x) axis = 1;
-    if(ext.z > ext[axis]) axis = 2;
+    uint8_t axis;
+    float split, cost;
 
-    float split = node.aabbMin[axis] + ext[axis] * 0.5f;
+    // Build using base split or SAH + split planes
+    if((_global>>8) & DISABLE_SAH){
+        Vec3 ext = node.aabbMax - node.aabbMin;
+        axis = 0u;
+        if(ext.y > ext.x) axis = 1u;
+        if(ext.z > ext[axis]) axis = 2u;
+        split = node.aabbMin[axis] + ext[axis] * 0.5f;
+    } else {
+        cost = getBestSplit(node, axis, split);
+        if(cost >= getNodeCost(node)) return;
+    }
 
     // Split the geometry in two parts
-    uint32_t i = node.leftFirst, j = i + node.n - 1;
+    int64_t i = node.leftFirst, j = i + node.n - 1;
     while(i<=j){
         Tri& tri = _tris[_triIdx[i]];
         if(tri.centroid()[axis]<split) i++;
@@ -146,7 +209,7 @@ RGBA PolyRenderer::parseColor(YAML::Node node){
     } else throw runtime_error("\e[1;91m  err parsing RGBA\e[0m\n");
 }
 
-uint16_t PolyRenderer::parseFlags(YAML::Node node){
+uint16_t PolyRenderer::parseFlags(YAML::Node node, bool print){
     uint16_t flags = 0x0000u;
     for(auto f : node){
         string flag = f.as<string>();
@@ -167,15 +230,16 @@ uint16_t PolyRenderer::parseFlags(YAML::Node node){
         else if(flag=="DISABLE_REFRACTIONS")
             flags |= DISABLE_REFRACTIONS;
         else if(flag=="DISABLE_FAST_INTERSECTION_SHADER"){
-            PolyRenderer::polyMsg("\e[1;96m  DISABLE_FAST_INTERSECTION_SHADER\e[0m\n");
             flags |= (DISABLE_FAST_INTERSECTION_SHADER<<8);
         }
         else if(flag=="FLAT_SHADING"){
-            PolyRenderer::polyMsg("\e[1;96m  FLAT_SHADING\e[0m\n");
             flags |= (FLAT_SHADING<<8);
-        }
+        } 
+        else if(flag=="DISABLE_SAH")
+            flags |= (DISABLE_SAH<<8);
         else PolyRenderer::polyMsg("\e[1;96m  err unknown flag '" + string(flag) + "'\e[0m\n");
-        
+        if(print)
+            PolyRenderer::polyMsg("\e[1;96m  " + string(flag) + "\e[0m\n");
     }
     return flags;
 }
@@ -195,7 +259,7 @@ bool PolyRenderer::loadScene(const char* path){
 
         // Parse global flags
         if(file["global"])
-            _global = (parseFlags(file["global"]) & 0xffffu);
+            _global = (parseFlags(file["global"], true) & 0xffffu);
         
         // Parse camera
         if(file["camera"]){
@@ -568,7 +632,6 @@ Vec3 PolyRenderer::bump_mapping(Hit& hit){
         float f = 1.0f / (du1 * dv2 - du2 * dv1);
 
         Vec3 tangent = Vec3(f * (dv2 * e1.x - dv1 * e2.x), f * (dv2 * e1.y - dv1 * e2.y), f * (dv2 * e1.z - dv1 * e2.z)).normalize();
-        // TODO: due to blender fix, (0,0) texture coordinate is left-down, not left-up
         Vec3 bitangent = Vec3(f * (du2 * e1.x - du1 * e2.x), f * (du2 * e1.y - du1 * e2.y), f * (du2 * e1.z - du1 * e2.z)).normalize();
 
         Vec3 bumpMap = mat.bump[tx + ty*TEXTURE_SIZE].toVec3()* 2.0f - 1.0f;
