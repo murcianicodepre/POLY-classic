@@ -32,16 +32,15 @@ bool Tri::intersect(Ray ray, Hit& hit){
     float t = inv * Vec3::dot(edge2, q);
     Vec3 normal = Vec3::cross(edge1, edge2).normalize();
     if(t>EPSILON && Vec3::dot(ray.dir, normal)<0.0f){  // Hit!
+        hit = Hit();
 
         hit.t = t;
         hit.normal = normal;
+        hit.phong = !(a.normal == 0.0f && b.normal == 0.0f && c.normal == 0.0f) ? (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize() : normal;
 
         hit.ray = ray;
         hit.u = (1.0f-U-V) * a.u + U * b.u + V * c.u;
         hit.v = (1.0f-U-V) * a.v + U * b.v + V * c.v;
-
-        // Compute interpolated normal
-        hit.phong = !(a.normal == 0.0f && b.normal == 0.0f && c.normal == 0.0f) ? (a.normal*(1.0f-U-V) + b.normal*U + c.normal*V).normalize() : hit.normal;
 
         return true;
     } else return false;
@@ -102,7 +101,7 @@ Poly::Poly(const char* path, uint8_t matId, uint8_t flags){
                 iss >> element; u = stof(element); iss >> element; v = stof(element);
             } else { u = v = 0.0f; }
 
-            Vertex vertex = Vertex(Vec3(x,y,z), Vec3(nx,ny,nz), u, 1.0f-v);
+            Vertex vertex = Vertex(Vec3(x,y,z), Vec3(nx,ny,nz), u, v);
             vertices.push_back(vertex);
 
         } else {        // Read tri data. Check if the line starts whith a 3

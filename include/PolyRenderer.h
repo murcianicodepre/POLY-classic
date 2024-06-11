@@ -50,12 +50,12 @@ public:
     bool intersection_shader(Ray&, Hit&, uint8_t discard = 0x00u);
     Fragment blinn_phong_shading(Hit&, uint8_t flags = 0x00u);
     Fragment flat_shading(Hit&);
-    Fragment fragment_shader(Hit&, uint8_t flags = 0x00u);
+    Fragment compute_fragment(Hit&, uint8_t flags = 0x00u);
     Fragment texture_mapping(Hit&);
     Vec3 bump_mapping(Hit&);
-    Fragment raytracing_shader(Hit&, uint8_t, uint8_t);
-    Fragment reflection_shader(Hit&, uint8_t, uint8_t);
-    Fragment refraction_shader(Hit&, uint8_t, uint8_t);
+    Fragment fragment_shader(Hit&, uint8_t, uint8_t);
+    Fragment compute_reflection(Hit&, uint8_t, uint8_t);
+    Fragment compute_refraction(Hit&, uint8_t, uint8_t);
 
     // Other renderer functions
     static RGBA* loadPNG(const char* path);

@@ -14,7 +14,7 @@ public:
     Vec3 ori, dir;
     uint32_t medium = 0u;   // By default, medium is "VOID_MAT"
     Ray();
-    Ray(Vec3 ori, Vec3 dir);
+    Ray(Vec3 ori, Vec3 dir, uint8_t medium = 0u);
     Vec3 point(float t);
     float getT(Vec3 point);
 };

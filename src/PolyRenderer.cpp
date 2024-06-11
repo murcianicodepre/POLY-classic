@@ -165,6 +165,7 @@ void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t di
         for(uint32_t i=0; i<node.n; i++){
             uint32_t triId = _triIdx[node.leftFirst+i];
             Tri& tri = _tris[_triIdx[node.leftFirst+i]];
+            uint16_t flags16 = _global | tri.flags;
 
             // Discard tri if matches discard
             if(tri.flags & discard) continue;
@@ -172,6 +173,9 @@ void PolyRenderer::intersectBVH(Ray& ray, Hit& hit, uint32_t nodeId, uint16_t di
             // Tri intersection test
             if(tri.intersect(ray, aux) && (aux.t < hit.t)){
                 hit = aux; hit.triId = triId;
+
+                // BUMP MAPPING STEP: compute bump mapping
+                hit.phong = (!(flags16 & DISABLE_BUMP) && !((flags16>>8) & FLAT_SHADING)) ? bump_mapping(hit) : hit.phong;
             }
         }
 
@@ -286,8 +290,7 @@ bool PolyRenderer::loadScene(const char* path){
                     reflect = (reflect>1.0f) ? 1.0f : (reflect<0.0f ? 0.0f : reflect);
                     Material mat = Material(diff, spec, reflect, refract);
                     if(m["texture"]) mat.loadTexture((script_path + m["texture"].as<string>()).c_str()); 
-                    else if(m["color"]) mat.color = parseColor(m["color"]);
-                    else { PolyRenderer::polyMsg("\e[1;91m  err parsing material: texture or color missing!\e[0m\n"); return false; }
+                    mat.color = (m["color"]) ? parseColor(m["color"]) : RGBA(204,204,204,255);
                     if(m["bump"]) mat.loadBump((script_path + m["bump"].as<string>()).c_str());
 
                     // Push material and name at same index
@@ -427,22 +430,19 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
     Hit hit;
     Fragment out;
     
-    // Intersection step
+    // Intersection test for primary ray
     if(intersection_shader(ray, hit)){
         Tri& tri = _tris[hit.triId];
         Material& mat = _mats[tri.matId], & oldMat = _mats[hit.ray.medium];
         uint16_t flags = (tri.flags | _global);
 
-        out = (!((flags>>8u) & FLAT_SHADING) && 
-            ((mat.reflective>0.0f && !(flags & DISABLE_REFLECTIONS)) || (mat.refractive!=1.0f && !(flags & DISABLE_REFRACTIONS)))) ? 
-            raytracing_shader(hit, 0, 0):
-            fragment_shader(hit);
+        out = fragment_shader(hit, 0,0);
     }
 
     return RGBA(out);
 }
 
-Fragment PolyRenderer::reflection_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
+Fragment PolyRenderer::compute_reflection(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
     Tri& tri = _tris[hit.triId];
     Material& mat = _mats[tri.matId];
 
@@ -450,10 +450,10 @@ Fragment PolyRenderer::reflection_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t
     Ray rray = Ray(hit.point(), rdir); rray.medium = tri.matId;
     Hit rhit;
 
-    return (intersection_shader(rray, rhit)) ? raytracing_shader(rhit, N_REFLECTION, N_REFRACTION) : fragment_shader(hit);
+    return (intersection_shader(rray, rhit)) ? fragment_shader(rhit, N_REFLECTION, N_REFRACTION) : compute_fragment(hit);
 }
 
-Fragment PolyRenderer::refraction_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
+Fragment PolyRenderer::compute_refraction(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
     Tri& tri = _tris[hit.triId];
     Material& newMat = _mats[tri.matId], & oldMat = _mats[hit.ray.medium];
 
@@ -461,34 +461,42 @@ Fragment PolyRenderer::refraction_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t
     float sinTheta2 = (oldMat.refractive / newMat.refractive) * sinf(theta1);
 
     if(sinTheta2>=1.0f){
-        return reflection_shader(hit, N_REFLECTION+1, N_REFRACTION);
+        return compute_reflection(hit, N_REFLECTION+1, N_REFRACTION);
     } else {
         Vec3 rdir = (hit.ray.dir + hit.phong * cosTheta1) * (oldMat.refractive / newMat.refractive) - hit.phong * cosTheta1;
         Ray rray = Ray(hit.point(), rdir); rray.medium = _tris[hit.triId].matId;
         Hit rhit;
 
-        return (intersection_shader(rray, rhit)) ? raytracing_shader(rhit, N_REFLECTION, N_REFRACTION) : fragment_shader(hit);
+        return (intersection_shader(rray, rhit)) ? fragment_shader(rhit, N_REFLECTION, N_REFRACTION) : compute_fragment(hit);
     }
 }
 
-// Raytracing shader: computes reflection and refraction for a given hit
-Fragment PolyRenderer::raytracing_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
+// fragment_shader: compute recursive fragment color
+Fragment PolyRenderer::fragment_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N_REFRACTION){
     Tri& tri = _tris[hit.triId];
     Material& mat = _mats[tri.matId];
     uint16_t flags = (tri.flags | _global);
 
-    // First compute color from fragment_shader or from refraction_shader
-    Fragment frag = (!(flags & DISABLE_REFRACTIONS) && (mat.refractive!=1.0f) && (N_REFRACTION<MAX_RAY_BOUNCES)) ? 
-        refraction_shader(hit, N_REFLECTION, N_REFRACTION+1) * fragment_shader(hit, DISABLE_SHADING) * Vec3(0.9f) : 
-        fragment_shader(hit) * Vec3(0.9f);
+    Fragment frag = compute_fragment(hit);
 
-    // Then compute reflection
+    // First compute color from compute_fragment or compute_refraction
+    Fragment color = (!(flags & DISABLE_REFRACTIONS) && (mat.refractive!=1.0f) && (N_REFRACTION<MAX_RAY_BOUNCES)) ? 
+        compute_refraction(hit, N_REFLECTION, N_REFRACTION+1) * compute_fragment(hit, DISABLE_SHADING) * Vec3(0.9f) : 
+        frag;
+
+    // Then compute reflection if necessary
     Fragment reflection = (!(flags & DISABLE_REFLECTIONS) && (mat.reflective>0.0f) && (N_REFLECTION<MAX_RAY_BOUNCES)) ?
-        reflection_shader(hit, N_REFLECTION+1, N_REFRACTION) * Vec3(0.9f) :
-        fragment_shader(hit) * Vec3(0.9f);
+        compute_reflection(hit, N_REFLECTION+1, N_REFRACTION) * Vec3(0.9f) :
+        frag;
 
     // Compute final color
-    return (frag * (1.0f - mat.reflective)) + (reflection * mat.reflective);
+    Fragment out =  (color * (1.0f - mat.reflective)) + (reflection * mat.reflective);
+
+    // Alpha blending step: if the fragment has some transparency, check if there's a valid intersection behind
+    Hit aux = Hit();
+    Ray ray = Ray(hit.point(), hit.ray.dir, tri.matId);
+    if(out.a<1.0f && intersection_shader(ray, aux)) return out + fragment_shader(aux, N_REFLECTION, N_REFRACTION);
+    else return out;
 }
 
 // Intersection shader: compute closest tri hit
@@ -498,6 +506,7 @@ bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint8_t discard){
         Hit aux;
         for(uint32_t i=0; i<_tris.size(); i++){
             Tri& tri = _tris[i];
+            uint16_t flags16 = _global | tri.flags;
 
             // Discard if tri.flags matches with discard flag
             if(tri.flags & discard) continue;
@@ -505,45 +514,34 @@ bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint8_t discard){
             // Intersection test
             if(tri.intersect(ray, aux) && (aux.t < hit.t)){
                 hit = aux; hit.triId = i; hit.ray = ray;
+
+                // BUMP MAPPING STEP: compute bump mapping
+                hit.phong = (!(flags16 & DISABLE_BUMP) && !((flags16>>8) & FLAT_SHADING)) ? bump_mapping(hit) : hit.phong;
             }
         }
     } else {
         intersectBVH(ray, hit, 0, discard);
     }
+
     return (hit.t < __FLT_MAX__);
 }
 
 // Fragmen shader: compute fragment color and shading
-Fragment PolyRenderer::fragment_shader(Hit& hit, uint8_t flags){
+Fragment PolyRenderer::compute_fragment(Hit& hit, uint8_t flags){
     Tri& tri = _tris[hit.triId];
     Material& mat = _mats[tri.matId];
     Ray& ray = hit.ray;
-    Fragment out;
     uint16_t flags16 = (tri.flags | _global | flags);
-    Vec3 rdir;
-    Hit hit2;
 
     // TEXTURE MAPPING STEP: compute texture
     Fragment tex = (!(flags16 & DISABLE_TEXTURES) && !((flags16>>8) & FLAT_SHADING) && tri.matId<_mats.size()) ? 
-        texture_mapping(hit) : Fragment(0.8f, 0.8f, 0.8f, 1.0f);
-
-    // BUMP MAPPING STEP: compute bump mapping
-    hit.phong = (!(flags16 & DISABLE_BUMP) && !((flags16>>8) & FLAT_SHADING) && tri.matId<_mats.size()) ? bump_mapping(hit) : hit.phong;
+        texture_mapping(hit) : Fragment(mat.color);
 
     // SHADING STEP: compute shading for this hit
     Fragment shading = ((flags16 >> 8) & FLAT_SHADING) ? flat_shading(hit) : blinn_phong_shading(hit, flags);
 
     // Compute fragment color
-    out = shading * tex;
-
-    // ALPHA BLENDING STEP
-    if(!(flags16 & DISABLE_TRANSPARENCY) && tri.matId<_mats.size() && tex.a<1.0f){
-        Ray rray = Ray(hit.point(), ray.dir); rray.medium = tri.matId;
-        if(intersection_shader(rray, hit2)) 
-            return (out * tex.a) + fragment_shader(hit2);
-    }
-
-    return out;
+    return shading*tex;
 }
 
 // Blinn-Phong shader: compute blinn-phong shading for given hit
@@ -611,7 +609,7 @@ Fragment PolyRenderer::texture_mapping(Hit& hit){
     Material& mat = _mats[_tris[hit.triId].matId];
     if(mat.texture){
         uint16_t tx = hit.u * (TEXTURE_SIZE - 1); tx %= (TEXTURE_SIZE-1);
-        uint16_t ty = hit.v * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
+        uint16_t ty = (1.0f-hit.v) * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
         return Fragment(mat.texture[tx + ty*TEXTURE_SIZE]);
     } else return Fragment(mat.color);
 }
@@ -622,7 +620,7 @@ Vec3 PolyRenderer::bump_mapping(Hit& hit){
     if(mat.bump){
         // Convert to tangent coordinates and compute normal vector using bump texture https://learnopengl.com/Advanced-Lighting/Normal-Mapping
         uint16_t tx = hit.u * (TEXTURE_SIZE - 1); tx %= (TEXTURE_SIZE-1);
-        uint16_t ty = hit.v * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
+        uint16_t ty = (1.0f-hit.v) * (TEXTURE_SIZE - 1); ty %= (TEXTURE_SIZE-1);
 
         // Compute tangent and bitangent
         Tri& tri = _tris[hit.triId];
@@ -632,7 +630,7 @@ Vec3 PolyRenderer::bump_mapping(Hit& hit){
         float f = 1.0f / (du1 * dv2 - du2 * dv1);
 
         Vec3 tangent = Vec3(f * (dv2 * e1.x - dv1 * e2.x), f * (dv2 * e1.y - dv1 * e2.y), f * (dv2 * e1.z - dv1 * e2.z)).normalize();
-        Vec3 bitangent = Vec3(f * (du2 * e1.x - du1 * e2.x), f * (du2 * e1.y - du1 * e2.y), f * (du2 * e1.z - du1 * e2.z)).normalize();
+        Vec3 bitangent = Vec3(f * (-du2 * e1.x + du1 * e2.x), f * (-du2 * e1.y + du1 * e2.y), f * (-du2 * e1.z + du1 * e2.z)).normalize();
 
         Vec3 bumpMap = mat.bump[tx + ty*TEXTURE_SIZE].toVec3()* 2.0f - 1.0f;
 
