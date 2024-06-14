@@ -98,10 +98,12 @@ float PolyRenderer::getBestSplit(BVHNode& node, uint8_t& axis, float& split){
     for(uint8_t a = 0; a<3; a++){
         float minBounds = node.aabbMin[a], maxBounds = node.aabbMax[a];
         if(minBounds==maxBounds) continue;
-        float s = (maxBounds-minBounds) / SPLIT_PLANES;
-        for(uint8_t i=0; i<SPLIT_PLANES; i++){
+        float s = (maxBounds-minBounds) / _splits;
+        
+        for(uint32_t i=0; i<_splits; i++){
             float candidatePos = minBounds + i*s;
             float cost = EvaluateSAH(node, a, candidatePos);
+
             if(cost<bestCost){
                 split = candidatePos, axis = a, bestCost = cost;
             }
@@ -233,12 +235,10 @@ uint16_t PolyRenderer::parseFlags(YAML::Node node, bool print){
             flags |= DISABLE_REFLECTIONS;
         else if(flag=="DISABLE_REFRACTIONS")
             flags |= DISABLE_REFRACTIONS;
-        else if(flag=="DISABLE_FAST_INTERSECTION_SHADER"){
+        else if(flag=="DISABLE_FAST_INTERSECTION_SHADER")
             flags |= (DISABLE_FAST_INTERSECTION_SHADER<<8);
-        }
-        else if(flag=="FLAT_SHADING"){
+        else if(flag=="FLAT_SHADING")
             flags |= (FLAT_SHADING<<8);
-        } 
         else if(flag=="DISABLE_SAH")
             flags |= (DISABLE_SAH<<8);
         else PolyRenderer::polyMsg("\e[1;96m  err unknown flag '" + string(flag) + "'\e[0m\n");
@@ -264,6 +264,12 @@ bool PolyRenderer::loadScene(const char* path){
         // Parse global flags
         if(file["global"])
             _global = (parseFlags(file["global"], true) & 0xffffu);
+
+        // Parse split planes if present
+        if(file["split_planes"] && !((_global>>8) & DISABLE_SAH)){
+            _splits = file["split_planes"].as<uint32_t>();
+            PolyRenderer::polyMsg("\e[1;96m  SPLIT_PLANES = " + to_string(_splits) + "\e[0m\n");
+        }
         
         // Parse camera
         if(file["camera"]){
@@ -377,7 +383,7 @@ bool PolyRenderer::loadScene(const char* path){
 }
 
 // Render scene using N threads
-bool PolyRenderer::render(uint8_t threads, bool ENABLE_RENDERING_WINDOW){
+bool PolyRenderer::render(uint8_t threads){
 
     // If global option DISABLE_RENDERING is set, return false directly
     if((_global & 0xffu) & DISABLE_RENDERING){
@@ -495,7 +501,7 @@ Fragment PolyRenderer::fragment_shader(Hit& hit, uint8_t N_REFLECTION, uint8_t N
     // Alpha blending step: if the fragment has some transparency, check if there's a valid intersection behind
     Hit aux = Hit();
     Ray ray = Ray(hit.point(), hit.ray.dir, tri.matId);
-    if(out.a<1.0f && intersection_shader(ray, aux)) return out + fragment_shader(aux, N_REFLECTION, N_REFRACTION);
+    if(!(flags & DISABLE_TRANSPARENCY) && out.a<1.0f && intersection_shader(ray, aux)) return out + fragment_shader(aux, N_REFLECTION, N_REFRACTION);
     else return out;
 }
 

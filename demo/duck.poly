@@ -1,8 +1,10 @@
 
 # duck demo
 global:
-    - DISABLE_SHADING
-    - DISABLE_TEXTURES
+  - FLAT_SHADING
+  - DISABLE_SAH
+
+split_planes: 128
 
 camera:
   position: [0.0, 0.25, 0.0]

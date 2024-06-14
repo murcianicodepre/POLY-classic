@@ -30,7 +30,6 @@ constexpr uint16_t TEXTURE_SIZE = 1024;
 constexpr uint8_t TILE_SIZE = 8;
 constexpr float AR = 1.33333f;
 constexpr uint8_t MAX_RAY_BOUNCES = 255u;
-constexpr uint8_t SPLIT_PLANES = 64u;
 
 
 // Individual tri rendering flags

@@ -32,11 +32,11 @@ public:
 
     // Main program functions
     bool loadScene(const char* scene);
-    bool render(uint8_t threads, bool ENABLE_RENDERING_WINDOW);
+    bool render(uint8_t threads);
     void save(const char* path);
 
     // Acceleration struct
-    uint32_t _nextNode = 1, * _triIdx = nullptr;
+    uint32_t _nextNode = 1, * _triIdx = nullptr, _splits = 128u;
     void buildBVH();
     void updateNodeBounds(uint32_t nodeId);
     void subdivide(uint32_t nodeId);
@@ -67,7 +67,7 @@ public:
     static RGBA parseColor(YAML::Node node);
     static uint16_t parseFlags(YAML::Node node, bool print = false);
 
-    // Debug flags
+    // Global flags
     uint16_t _global = 0x00000000u;
 }; 
 
