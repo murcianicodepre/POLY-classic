@@ -1,5 +1,7 @@
 # cornell demo 
 
+split_planes: 32
+
 camera:
   position: [0.0, 0.0, 0.0]
   fov: 40.0
@@ -12,9 +14,10 @@ materials:
     specular: 32.0
   - name: "mat2"
     color: [0,255,0]
-    bump: "textures/concrete_bump.png"
+    #bump: "textures/concrete_bump.png"
     diffuse: 2.0
     specular: 32.0
+    reflective: 1.0
   - name: "mat3"
     color: [200,200,200]
     bump: "textures/concrete_bump.png"
@@ -28,16 +31,16 @@ materials:
     refractive: 1.333
   - name: "mirror1"
     color: [255,255,255]
+    bump: "textures/metal_bump.png"
     diffuse: 2.0
     specular: 32.0
-    reflective: 1.0
-    refractive: 1.333
+    #reflective: 0.4
 
   - name: "mirror2"
     color: [255,255,255]
     diffuse: 2.0
     specular: 32.0
-    reflective: 0.9
+    #reflective: 0.9
 
   - name: "duckmat"
     texture: "textures/duck.png"
@@ -119,8 +122,8 @@ objects:
     material: "mirror1"
     transforms:
       scale: [0.2, 0.4, 0.2]
-      rotate: [0.0, -20.0, 0.0]
-      move: [-0.25, -0.6, 2.2]
+      rotate: [0.0, -25.0, 0.0]
+      move: [-0.3, -0.6, 2.2]
 
   - name: "block2"
     file: "models/cube.ply"
@@ -138,7 +141,7 @@ objects:
       rotate: [0.0, -30.0, 0.0]
       move: [-0.1, -0.59, 1.8]
 
-  - name: "ball"
+  - name: "sphere"
     file: "models/sphere.ply"
     material: "mirror2"
     transforms:

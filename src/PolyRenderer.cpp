@@ -453,7 +453,7 @@ Fragment PolyRenderer::compute_reflection(Hit& hit, uint8_t N_REFLECTION, uint8_
     Material& mat = _mats[tri.matId];
 
     Vec3 rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
-    Ray rray = Ray(hit.point(), rdir); rray.medium = tri.matId;
+    Ray rray = Ray(hit.point(), rdir); rray.medium = 0u;
     Hit rhit;
 
     return (intersection_shader(rray, rhit)) ? fragment_shader(rhit, N_REFLECTION, N_REFRACTION) : compute_fragment(hit);
@@ -467,6 +467,7 @@ Fragment PolyRenderer::compute_refraction(Hit& hit, uint8_t N_REFLECTION, uint8_
     float sinTheta2 = (oldMat.refractive / newMat.refractive) * sinf(theta1);
 
     if(sinTheta2>=1.0f){
+        hit.ray.medium = tri.matId;
         return compute_reflection(hit, N_REFLECTION+1, N_REFRACTION);
     } else {
         Vec3 rdir = (hit.ray.dir + hit.phong * cosTheta1) * (oldMat.refractive / newMat.refractive) - hit.phong * cosTheta1;
@@ -522,7 +523,7 @@ bool PolyRenderer::intersection_shader(Ray& ray, Hit& hit, uint8_t discard){
                 hit = aux; hit.triId = i; hit.ray = ray;
 
                 // BUMP MAPPING STEP: compute bump mapping
-                hit.phong = (!(flags16 & DISABLE_BUMP) && !((flags16>>8) & FLAT_SHADING)) ? bump_mapping(hit) : hit.phong;
+                hit.phong = (!(flags16 & DISABLE_BUMP) && !((flags16>>8) & FLAT_SHADING)) ? bump_mapping(aux) : hit.phong;
             }
         }
     } else {
