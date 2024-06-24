@@ -54,8 +54,8 @@ public:
     Fragment texture_mapping(Hit&);
     Vec3 bump_mapping(Hit&);
     Fragment fragment_shader(Hit&, uint8_t);
-    Fragment compute_reflection(Hit&, uint8_t);
-    Fragment compute_refraction(Hit&, uint8_t);
+    Ray compute_reflection(Hit&);
+    Ray compute_refraction(Hit&);
 
     // Other renderer functions
     static RGBA* loadPNG(const char* path);

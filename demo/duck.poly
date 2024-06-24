@@ -1,6 +1,5 @@
 
 # duck demo
-
 camera:
   position: [0.0, 0.25, 0.0]
   fov: 40.0
@@ -8,9 +7,9 @@ camera:
 materials: 
   
   - name: "duck_mat"
-    texture: "textures/pc-jo.png"
-    color: [255,0,0]
-    #bump: "textures/duck_bump.png"
+    texture: "textures/duck.png"
+    color: [255,0,0, 100]
+    bump: "textures/duck_bump.png"
     diffuse: 2.0
     specular: 32.0
     
@@ -19,6 +18,7 @@ materials:
     color: [0,255,0]
     diffuse: 2.0
     specular: 16.0
+    reflective: 0.5
 
   - name: "sky_mat"
     texture: "textures/sky3.png"
@@ -37,22 +37,19 @@ objects:
       move: [0.0, 0.0, 2.0]
 
   - name: "duck"
-    file: "models/cube.ply"
+    file: "models/duck2.ply"
     material: "duck_mat"
     transforms:
-      scale: 0.3
-      #rotate: [0.0, 30.0, 0.0]
-      #move: [0.0, -0.2, 2.0]
-      move: [0.0, 0.0, 2.0]
+      rotate: [0.0, 30.0, 0.0]
+      move: [0.0, -0.2, 2.0]
 
   - name: "floor"
     file: "models/quad.ply"
-    material: "mat"
+    material: "mat1"
     transforms:
-      scale: 1.5
+      scale: 2.0
       rotate: [90.0, 0.0, 0.0]
       move: [0.0, -0.2, 2.0]
-
 
 lights:
   - type: directional

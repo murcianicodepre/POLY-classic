@@ -448,33 +448,31 @@ RGBA PolyRenderer::compute_pixel(uint16_t x, uint16_t y){
     return RGBA(out);
 }
 
-Fragment PolyRenderer::compute_reflection(Hit& hit, uint8_t RAY_BOUNCE){
+Ray PolyRenderer::compute_reflection(Hit& hit){
     Tri& tri = _tris[hit.triId];
     Material& mat = _mats[tri.matId];
 
     Vec3 rdir = hit.ray.dir - hit.phong * (Vec3::dot(hit.ray.dir, hit.phong) * 2.0f);
-    Ray rray = Ray(hit.point(), rdir); rray.medium = 0u;
-    Hit rhit;
-
-    return (intersection_shader(rray, rhit)) ? fragment_shader(rhit, RAY_BOUNCE) : compute_fragment(hit);
+    return Ray(hit.point(), rdir, tri.matId);
 }
 
-Fragment PolyRenderer::compute_refraction(Hit& hit, uint8_t RAY_BOUNCE){
+Ray PolyRenderer::compute_refraction(Hit& hit){
     Tri& tri = _tris[hit.triId];
-    Material& newMat = _mats[tri.matId], & oldMat = _mats[hit.ray.medium];
+    Material& newMat = _mats[tri.matId];
+    Material& oldMat = _mats[hit.ray.medium];
+    Vec3 rdir;
 
     float cosTheta1 = Vec3::dot(hit.ray.dir, hit.phong) * -1.0f, theta1 = acosf(cosTheta1);
     float sinTheta2 = (oldMat.refractive / newMat.refractive) * sinf(theta1);
 
     if(sinTheta2>=1.0f){
-        hit.ray.medium = tri.matId;
-        return compute_reflection(hit, RAY_BOUNCE+1);
+        return compute_reflection(hit);
     } else {
         Vec3 rdir = (hit.ray.dir + hit.phong * cosTheta1) * (oldMat.refractive / newMat.refractive) - hit.phong * cosTheta1;
         Ray rray = Ray(hit.point(), rdir); rray.medium = _tris[hit.triId].matId;
         Hit rhit;
 
-        return (intersection_shader(rray, rhit)) ? fragment_shader(rhit, RAY_BOUNCE) : compute_fragment(hit);
+        return Ray(hit.point(), rdir, tri.matId);
     }
 }
 
@@ -482,29 +480,36 @@ Fragment PolyRenderer::compute_refraction(Hit& hit, uint8_t RAY_BOUNCE){
 Fragment PolyRenderer::fragment_shader(Hit& hit, uint8_t RAY_BOUNCE){
     Tri& tri = _tris[hit.triId];
     Material& mat = _mats[tri.matId];
-    uint16_t flags = (tri.flags | _global);
+    uint16_t flags16 = (tri.flags | _global);
 
-    Fragment frag = compute_fragment(hit);
+    Fragment frag;
+    Ray ray;
+    Hit aux;
 
-    // First compute color from compute_fragment or compute_refraction
-    Fragment color = (!(flags & DISABLE_REFRACTIONS) && (mat.refractive!=1.0f) && (RAY_BOUNCE<MAX_RAY_BOUNCES)) ? 
-        compute_refraction(hit, RAY_BOUNCE+1) * compute_fragment(hit, DISABLE_SHADING) * Vec3(1.0f - (RAY_BOUNCE*RAY_BOUNCE_ATT)) : 
-        frag;
+    // Compute fragment color
+    if(!(flags16 & DISABLE_REFRACTIONS) && (mat.refractive<1.0f || mat.refractive>1.0f) && (RAY_BOUNCE<MAX_RAY_BOUNCES)){
+        ray = compute_refraction(hit);
+        aux = Hit();
+        frag = (intersection_shader(ray, aux)) ? 
+            (fragment_shader(aux,RAY_BOUNCE+1) * Vec3(1.0f - RAY_BOUNCE*RAY_BOUNCE_ATT)) * compute_fragment(hit,DISABLE_SHADING) : 
+            frag;
+    } else frag = compute_fragment(hit);
 
-    // Then compute reflection if necessary
-    Fragment reflection = (!(flags & DISABLE_REFLECTIONS) && (mat.reflective>0.0f) && (RAY_BOUNCE<MAX_RAY_BOUNCES)) ?
-        compute_reflection(hit, RAY_BOUNCE+1) * Vec3(1.0f - (RAY_BOUNCE*RAY_BOUNCE_ATT)) :
-        frag;
+    // Compute reflection component if necessary
+    if(!(flags16 & DISABLE_REFLECTIONS) && (mat.reflective>0.0f) && (RAY_BOUNCE<MAX_RAY_BOUNCES)){
+        ray = compute_reflection(hit);
+        aux = Hit();
+        frag = (intersection_shader(ray, aux)) ?
+            (frag * Vec3(1.0f - mat.reflective)) + (fragment_shader(aux,RAY_BOUNCE+1) * Vec3(mat.reflective) * Vec3(1.0f - RAY_BOUNCE*RAY_BOUNCE_ATT)) :
+            frag;
+    }
 
-    // Compute final color
-    Fragment out = (color * (1.0f - mat.reflective)) + (reflection * mat.reflective);
-
-    // Alpha blending step: if the fragment has some transparency, check if there's a valid intersection behind
-    Hit aux = Hit();
-    Ray ray = Ray(hit.point(), hit.ray.dir, tri.matId);
-    if(!(flags & DISABLE_TRANSPARENCY) && out.a<1.0f && intersection_shader(ray, aux)) 
-        return (out * Vec3(out.a)) + fragment_shader(aux, RAY_BOUNCE+1);
-    else return out;
+    // Alpha blending step
+    aux = Hit();
+    ray = Ray(hit.point(), hit.ray.dir, tri.matId);
+    if((frag.a<1.0f) && !(flags16 & DISABLE_TRANSPARENCY) && (intersection_shader(ray, aux))){
+        return (frag * Vec3(frag.a)) + fragment_shader(aux,RAY_BOUNCE+1);
+    } else return frag;
 }
 
 // Intersection shader: compute closest tri hit
