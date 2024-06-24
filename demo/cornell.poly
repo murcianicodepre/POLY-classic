@@ -14,10 +14,9 @@ materials:
     specular: 32.0
   - name: "mat2"
     color: [0,255,0]
-    #bump: "textures/concrete_bump.png"
+    bump: "textures/concrete_bump.png"
     diffuse: 2.0
     specular: 32.0
-    reflective: 1.0
   - name: "mat3"
     color: [200,200,200]
     bump: "textures/concrete_bump.png"
@@ -34,13 +33,13 @@ materials:
     bump: "textures/metal_bump.png"
     diffuse: 2.0
     specular: 32.0
-    #reflective: 0.4
+    reflective: 0.4
 
   - name: "mirror2"
     color: [255,255,255]
     diffuse: 2.0
     specular: 32.0
-    #reflective: 0.9
+    reflective: 0.9
 
   - name: "duckmat"
     texture: "textures/duck.png"

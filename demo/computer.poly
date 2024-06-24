@@ -1,0 +1,173 @@
+# computer.poly
+
+camera:
+  position: [0.6, 0.5, 0.0]
+  fov: 45.0
+  lookAt: [0.0, 0.5, 1.0]
+
+
+materials:
+  - name: "mat1"
+    color: [255,255,255]
+    diffuse: 2.0
+    specular: 32.0
+
+  - name: "skymat"
+    texture: "textures/sky3.png"
+    diffuse: 2.0
+    specular: 0.0
+
+  - name: "tablemat"
+    texture: "textures/table.png"
+    bump: "textures/table_bump.png"
+    diffuse: 2.0
+    specular: 32.0
+    reflective: 0.1
+
+  - name: "glassmat"
+    color: [255,255,255]
+    bump: "textures/drops_bump.png"
+    diffuse: 2.0
+    specular: 32.0
+    refractive: 1.5
+    reflective: 0.2
+
+  - name: "front_mat"
+    color: [255,255,255]
+    bump: "textures/concrete_bump.png"
+    diffuse: 2.0
+    specular: 32.0
+
+  - name: "shelf_mat"
+    color: [255,0,0]
+    bump: "textures/glass_bump.png"
+    diffuse: 2.0
+    specular: 32.0
+
+  - name: "klein1_mat"
+    color: [0,255,0]
+    diffuse: 2.0
+    specular: 32.0
+    refractive: 1.5
+  - name: "klein2_mat"
+    color: [0,0,255]
+    diffuse: 2.0
+    specular: 32.0
+    refractive: 1.5
+  - name: "klein3_mat"
+    color: [255,255,0]
+    diffuse: 2.0
+    specular: 32.0
+    refractive: 1.9
+
+objects:
+
+  - name: "mac"
+    material: mat1
+    file: "models/mac128.ply"
+    transforms:
+      scale: 0.27
+      rotate: [0.0, 10.0, 0.0]
+      move: [0.15, 0.0, 2.35]
+
+  - name: "table"
+    file: "models/table.ply"
+    material: "tablemat"
+    transforms:
+      scale: 0.5
+      move: [0.0, 0.0, 2.3]
+
+  - name: "winwall"
+    file: "models/winwall.ply"
+    material: mat1
+    transforms:
+      scale: 0.3
+      move: [0.15, -1.0, 2.35]
+
+  - name: "floor"
+    file: "models/quad.ply"
+    material: mat1
+    transforms:
+      scale: 5.0
+      rotate: [90.0, 0.0, 0.0]
+      move: [0.0, -1.0, 2.55]
+  - name: "ceiling"
+    file: "models/quad.ply"
+    material: mat1
+    transforms:
+      scale: 5.0
+      rotate: [-90.0, 0.0, 0.0]
+      move: [0.0, 2.6, 2.55]
+
+  - name: "frontwall"
+    file: "models/quad.ply"
+    material: front_mat
+    transforms:
+      scale: 5.0
+      move: [0.0, 0.0, 5.8]
+
+  - name: "glass"
+    file: "models/quad.ply"
+    material: "glassmat"
+    transforms:
+      rotate: [0.0, -90.0, 0.0]
+      move: [-2.57, 1.0, 3.2]
+
+  - name: "shelf1"
+    file: "models/shelf.ply"
+    material: shelf_mat
+    transforms:
+      scale: 0.35
+      move: [-0.7, 1.2, 5.5]
+  - name: "shelf2"
+    file: "models/shelf.ply"
+    material: shelf_mat
+    transforms:
+      scale: 0.35
+      move: [-1.7, 1.2, 5.5]
+  - name: "shelf3"
+    file: "models/shelf.ply"
+    material: shelf_mat
+    transforms:
+      scale: 0.35
+      move: [0.3, 1.2, 5.5]
+
+  - name: "klein1"
+    file: "models/klein.ply"
+    material: klein1_mat
+    flags:
+      - DISABLE_SHADOWS
+    transforms:
+      scale: 0.3
+      move: [-0.7, 1.3, 5.5]
+  - name: "klein2"
+    file: "models/klein.ply"
+    material: klein2_mat
+    flags:
+      - DISABLE_SHADOWS
+    transforms:
+      scale: 0.3
+      move: [-1.7, 1.3, 5.5]
+  - name: "klein3"
+    file: "models/klein.ply"
+    material: klein3_mat
+    flags:
+      - DISABLE_SHADOWS
+    transforms:
+      scale: 0.3
+      move: [0.3, 1.3, 5.5]
+
+lights:
+  - type: point
+    position: [0.0, 2.5, 2.55]
+    color: [255,255,255]
+    intensity: 0.7
+
+  - type: directional
+    direction: [-0.5, 1.0, -0.5]
+    color: [255,255,255]
+    intensity: 0.0
+
+  - type: ambient
+    intensity: 0.1
+    color: [255,255,255]

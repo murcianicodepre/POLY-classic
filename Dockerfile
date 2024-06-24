@@ -20,9 +20,14 @@ RUN mkdir build
 WORKDIR /app/build
 RUN cmake .. && make && make install
 
+# Copy demo files
+WORKDIR /
+RUN mkdir demo
+COPY demo /demo
+
 # Last remove source code and set working dir
-WORKDIR /poly-classic
 RUN rm -fr /app
+WORKDIR /poly-classic
 
 # Image is ready to run poly-classic passing the input .poly scene description
 # Example: docker run -v PATH-TO-SCENE-DATA:/poly-classic poly-classic SCENE.POLY [NTHREADS]

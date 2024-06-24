@@ -1,0 +1,59 @@
+# Fragmen shader demo image
+
+camera:
+  position: [0.0, 0.0, 0.0]
+  fov: 40.0
+
+materials:
+  - name: "duck_mat"
+    texture: "textures/duck.png"
+    bump: "textures/duck_bump.png"
+    diffuse: 2.0
+    specular: 32.0
+  - name: "mat1"
+    texture: "textures/demo_texture.png"
+    diffuse: 2.0
+    specular: 32.0
+  - name: "mat2"
+    color: [255,255,0]
+    diffuse: 2.0
+    specular: 32.0
+  
+objects:
+  - name: "duck"
+    file: "models/duck2.ply"
+    material: duck_mat
+    transforms:
+      rotate: [0.0, 30.0, 0.0]
+      move: [0.0, -0.3, 2.0]
+  - name: "tri1"
+    file: "models/tri.ply"
+    material: mat1
+    transforms:
+      scale: 0.2
+      rotate: [0.0, 0.0, -20.0]
+      move: [0.4, 0.6, 2.0]
+  - name: "tri2"
+    file: "models/tri.ply"
+    material: mat1
+    transforms:
+      scale: 0.2
+      rotate: [20.0, 0.0, 20.0]
+      move: [0.42, -0.2, 1.5] 
+
+  - name: "ray1"
+    file: "models/ray.ply"
+    material: mat2
+    transforms:
+      scale: [1.0, 1.3, 0.0]
+      rotate: [20.0, 20.0, -45.0]
+      move: [-0.4, -0.3, 1.5]
+
+lights:
+  - type: directional
+    direction: [-0.5, 1.0, -2.0]
+    color: [255,255,255]
+    intensity: 0.5
+  - type: "ambient"
+    intensity: 0.2
+    color: [255,0,0]
