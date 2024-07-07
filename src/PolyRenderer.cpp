@@ -581,7 +581,6 @@ Fragment PolyRenderer::blinn_phong_shading(Hit& hit, uint8_t flags){
                 att = 1.0f / (1.0f + 0.14f * dist + 0.07f * (dist*dist));
             } else if(l.get()->type()==LightType::Direction){
                 DirectionalLight* dl = dynamic_cast<DirectionalLight*>(l.get());
-                lpos = Vec3(1000.0f);
                 ldir = (dl->dir).normalize(); 
                 dist = __FLT_MAX__;
                 att = 1.0f;
@@ -593,8 +592,10 @@ Fragment PolyRenderer::blinn_phong_shading(Hit& hit, uint8_t flags){
                 Ray lray = Ray(sori, ldir);
                 Hit hit2;
 
+                float t = (l.get()->type()==LightType::Point) ? (lpos - sori).x / ldir.x : __FLT_MAX__; 
+
                 // Check intersecion with other geometry
-                if(intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING) && (hit2.t<lray.getT(lpos))) continue;
+                if(intersection_shader(lray, hit2, DISABLE_SHADOWS | DISABLE_SHADING) && (hit2.t<t)) continue;
             }
 
             // Compute fragment's specular and diffuse components
